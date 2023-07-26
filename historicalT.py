@@ -60,8 +60,9 @@ def get_AC_penetration_factor(gdp_data, deg_time_data):
     # Factor 0.68 between 1995 USD and 2011 USD
     inflation_factor = 0.68
     availability = 1/(1+np.exp(4.152)*np.exp(-0.237*inflation_factor*gdp_data/1000))
-    # Compute AC saturation as a function of cooling degree time
-    saturation = 1.00 - 0.949*np.exp(-0.00187*deg_time_data)
+    # Compute AC saturation as a function of cooling degree days
+    deg_days = deg_time_data/24
+    saturation = 1.00 - 0.949*np.exp(-0.00187*deg_days)
 
     # Compute AC penetration factor
     AC_penetration_factor = 1. - (availability * saturation)
