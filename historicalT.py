@@ -5,21 +5,7 @@ import matplotlib.pyplot as plt
 from plotting import plot_map, plot_time_curve
 
 #######################################
-# Load gridded datasets
-
-data_path = 'data_experiencedT/'
-
-# Population
-# Source: https://sedac.ciesin.columbia.edu/data/set/gpw-v4-population-count-rev11
-# Resolution: 1 degree
-# 2000, 2005, 2010, 2015, 2020
-pop_file = os.path.join(data_path, 'gpw_v4_population_count_rev11_1_deg.nc')
-pop_dataset = xr.open_dataset(pop_file)
-
-# GDP
-# Source: https://datadryad.org/stash/dataset/doi:10.5061/dryad.dk1j0
-# Resolution: 5 arc min = 1/12 degree
-gdp_file = os.path.join(data_path, 'GDP_per_capita_PPP_1990_2015_v2.nc')
+# ERA5 data set stored on Caltech server
 
 # Temperature
 # Source: https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-era5-land?tab=overview
@@ -32,16 +18,62 @@ def get_pop_data(year):
     """
     Get population data for a given year
     """
+
+    # Population
+    # Source: https://sedac.ciesin.columbia.edu/data/set/gpw-v4-population-count-rev11
+    # Resolution: 1 degree
+    # 2000, 2005, 2010, 2015, 2020
+    pop_file = 'data_experiencedT/gpw_v4_population_count_rev11_1_deg.nc'
+    pop_dataset = xr.open_dataset(pop_file)
+
     year_index = [2000, 2005, 2010, 2015, 2020].index(year)
     pop_data_year = pop_dataset["Population Count, v4.11 (2000, 2005, 2010, 2015, 2020): 1 degree"][year_index, :, :]
     # Drop the raster attribute
     pop_data_year = pop_data_year.drop('raster')
     return pop_data_year
 
-def compute_degree_days(year, era5_path):
+
+def get_gdp_data(year):
     """
-    Compute degree days for a given year
+    Get gdp data for a given year
     """
+    # GDP
+    # Source: https://datadryad.org/stash/dataset/doi:10.5061/dryad.dk1j0
+    # Resolution: 5 arc min = 1/12 degree
+    gdp_file = 'data_experiencedT/GDP_per_capita_PPP_1990_2015_v2.nc'
+    gdp_dataset = xr.open_dataset(gdp_file)
+    year_index = gdp_dataset['time'].values.tolist().index(year)
+    gdp_data_year = gdp_dataset["GDP_per_capita_PPP"][year_index, :, :]
+    
+    # Drop the time attribute
+    gdp_data_year = gdp_data_year.drop('time')
+    # Make grid coarser and change resolution to 1 degree
+    gdp_data_year = gdp_data_year.coarsen(latitude=12, longitude=12, boundary='trim').mean()
+
+    return gdp_data_year
+
+def get_AC_penetration_factor(gdp_data, deg_time_data):
+    """
+    Get AC penetration factor for given GDP and cooling degree time
+    """
+    # Compute availability as a function of GDP
+    # Factor 0.68 between 1995 USD and 2011 USD
+    inflation_factor = 0.68
+    availability = 1/(1+np.exp(4.152)*np.exp(-0.237*inflation_factor*gdp_data/1000))
+    # Compute AC saturation as a function of cooling degree time
+    saturation = 1.00 - 0.949*np.exp(-0.00187*deg_time_data)
+
+    # Compute AC penetration factor
+    AC_penetration_factor = 1. - (availability * saturation)
+
+    return AC_penetration_factor
+
+
+def compute_degree_time(year, era5_path):
+    """
+    Compute degree time for a given year
+    """
+    yearly_degree_time = None
     for month in range(1, 13):
         month = str(month).zfill(2)
         for day in range(1, 32):
@@ -58,99 +90,120 @@ def compute_degree_days(year, era5_path):
 
             # Make grid coarser and change resolution to 1 degree
             surface_temp = surface_temp.coarsen(latitude=4, longitude=4, boundary='trim').mean()
-            # Shift grid to go from 0 to 360 degrees and 90 to -90 degrees
+            # Shift grid to go from -180 to 180 degrees and 90 to -90 degrees
             surface_temp = surface_temp.assign_coords(longitude=(surface_temp.longitude - 179.875))
             surface_temp = surface_temp.assign_coords(latitude=(surface_temp.latitude - 0.125))
-
-            # Take mean over 24 hours
-            surface_temp = surface_temp.mean(dim='time')
             
-            # Compute degree days for each grid cell
+            # Compute degree time for each grid cell and each time step
             base_temp = 18.0
-            degree_days = surface_temp - (base_temp + 273.15)
-            # Set all negative values to zero
-            degree_days = degree_days.where(degree_days > 0, 0)
+            daily_degree_time = None
+            for i in range(len(surface_temp.time)):
+                degree_time = surface_temp[i, :, :] - (base_temp + 273.15)
+                # Set all negative values to zero
+                degree_time = degree_time.where(degree_time > 0, 0)
+                if daily_degree_time is None:
+                    daily_degree_time = degree_time
+                else:
+                    daily_degree_time += degree_time
 
             # Sum over all grid cells
-            if yearly_degree_days is None:
-                yearly_degree_days = degree_days
+            if yearly_degree_time is None:
+                yearly_degree_time = degree_time
             else:
-                yearly_degree_days += degree_days
+                yearly_degree_time += degree_time
+    
+    return yearly_degree_time
 
-def get_deg_day_data(year, era5_path):
+def get_deg_time_data(year, era5_path):
     """
-    Get degree day data for a given year
+    Get degree time data for a given year
     """
-    yearly_degree_days = None
-    if not os.path.exists('yearly_deg_days/'):
-        os.mkdir('yearly_deg_days/')
-    if not os.path.exists('yearly_deg_days/yearly_degree_days_{0}.nc'.format(year)):
-        yearly_degree_days = compute_degree_days(year, era5_path)
-        yearly_degree_days.to_netcdf('yearly_deg_days/yearly_degree_days_{0}.nc'.format(year))
+    if not os.path.exists('yearly_deg_time/'):
+        os.mkdir('yearly_deg_time/')
+    if not os.path.exists('yearly_deg_time/yearly_degree_time_{0}.nc'.format(year)):
+        yearly_degree_time = compute_degree_time(year, era5_path)
+        yearly_degree_time.to_netcdf('yearly_deg_time/yearly_degree_time_{0}.nc'.format(year))
     else:
-        yearly_degree_days = xr.open_dataset('yearly_deg_days/yearly_degree_days_{0}.nc'.format(year))['t2m']
-    return yearly_degree_days
+        yearly_degree_time = xr.open_dataset('yearly_deg_time/yearly_degree_time_{0}.nc'.format(year))['t2m']
+    return yearly_degree_time
  
 
 #######################################
-# Compute population weighted cooling degree days
+# Compute population weighted cooling degree time
 
 def main():
     """
-    Compute population weighted cooling degree days, separating effects of population and temperature change
+    Compute population weighted cooling degree time, separating effects of population and temperature change
     """
     all_data_dict = {}
-    for case in ["population_effect", "temperature_effect", "both_effects"]:
-
-        all_years = [2000, 2005, 2010, 2015, 2020]
-        ref_year = [2000]
+    all_years = [2000, 2005, 2010, 2015]
+    ref_year = [2000]
+    
+    for case in ["population_effect", "temperature_effect", "gdp_effect", "all_effects"]:
+        print ("case: ", case)
 
         if case == "population_effect":
             pop_years = all_years
             temp_years = ref_year
+            gdp_years = ref_year
 
         elif case == "temperature_effect":
             pop_years = ref_year
             temp_years = all_years
+            gdp_years = ref_year
+
+        elif case == "gdp_effect":
+            pop_years = ref_year
+            temp_years = ref_year
+            gdp_years = all_years
         
         else:
             pop_years = all_years
             temp_years = "same"
+            gdp_years = "same"
 
 
-        deg_day_dict = {}
+        deg_time_dict = {}
         for pop_year in pop_years:
 
             # Population data
             pop_data_year = get_pop_data(pop_year)
- 
 
-            # Temperature to cooling degree days
-            for temp_year in temp_years:
+            # Temperature to cooling degree time
+            if temp_years == "same":
+                run_temp_years = [pop_year]
+            else:
+                run_temp_years = temp_years
+            for temp_year in run_temp_years:
 
-                if temp_years == "same":
-                    temp_year = pop_year
+                # Degree time data
+                yearly_degree_time = get_deg_time_data(temp_year, era5_path)
 
-                # Degree day data
-                yearly_degree_days = get_deg_day_data(temp_year, era5_path)
+                if gdp_years == "same":
+                    run_gdp_years = [pop_year]
+                else:
+                    run_gdp_years = gdp_years
+                for gdp_year in run_gdp_years:
 
+                    gdp_data_year = get_gdp_data(gdp_year)
+                    AC_penetration_factor = get_AC_penetration_factor(gdp_data_year, yearly_degree_time)
 
-                # Multiply degree day grid by population grid
-                pop_weighted_cdd = yearly_degree_days * pop_data_year
+                    # Multiply degree time grid by population grid and gdp grid
+                    weighted_cdd = yearly_degree_time * pop_data_year * AC_penetration_factor
 
-                # Compute global average and store in dictionary
-                global_average = pop_weighted_cdd.mean()
-                deg_day_dict["pop{0}_temp{1}".format(pop_year, temp_year)] = global_average
+                    # Compute global average and store in dictionary
+                    global_average = weighted_cdd.mean()
+                    deg_time_dict["pop{0}_temp{1}_gdp{2}".format(pop_year, temp_year, gdp_year)] = global_average
 
-                # Plot the population weighted cooling degree days for 2020 for all effects separately
-                if pop_year == 2020 or temp_year == 2020:
-                    plot_map(pop_weighted_cdd, pop_year, temp_year)
+                    # Plot the population weighted cooling degree time for 2015 for all effects separately
+                    if pop_year == 2015 or temp_year == 2015 or gdp_year == 2015:
+                        plot_map(weighted_cdd, pop_year, temp_year, gdp_year)
 
         # Accumulate data in dictionary                
-        all_data_dict[case] = deg_day_dict
+        all_data_dict[case] = deg_time_dict
 
     # Plot the time curves for the different effects
-    plot_time_curve(all_data_dict)
+    plot_time_curve(all_data_dict, all_years)
 
 
 if __name__ == '__main__':
