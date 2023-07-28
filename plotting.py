@@ -15,7 +15,7 @@ def plot_map(pop_weighted_cdd, pop_year, temp_year, gdp_year):
     # Plot the data
     # Use imshow to plot the data with the latitude values on the y-axis and longitude values on the x-axis
     # color bar same height as plot
-    pop_plot = ax.imshow(pop_weighted_cdd, origin='lower', extent=[0, 360, -90, 90], cmap='coolwarm', norm=LogNorm(vmin=1e5, vmax=1e9))
+    pop_plot = ax.imshow(pop_weighted_cdd, extent=[-180, 180, 90, -90], origin='lower', cmap='coolwarm', norm=LogNorm(vmin=1e6, vmax=3e9))
     # Add a colorbar
     # Create an axes on the right side of ax. The width of cax will be 5%
     # of ax and the padding between cax and ax will be fixed at 0.05 inch.
@@ -31,11 +31,11 @@ def plot_map(pop_weighted_cdd, pop_year, temp_year, gdp_year):
 
 
     # Set the labels for the x and y axes
-    ax.set_xlabel('Longitude Index')
-    ax.set_ylabel('Latitude Index')
+    ax.set_xlabel('Longitude (°E)')
+    ax.set_ylabel('Latitude (°N)')
 
     # Set the title of the plot
-    ax.set_title('Population and GDP weighted cooling degree hours for the Year pop {0}, temp {1}, gdp {2}'.format(pop_year, temp_year, gdp_year))
+    ax.set_title('Population and GDP weighted cooling degree hours for the Year pop {0}, temp {1}, gdp {2}'.format(pop_year, temp_year, gdp_year), pad=20)
 
     # Save the figure
     if not os.path.exists('Figures'):

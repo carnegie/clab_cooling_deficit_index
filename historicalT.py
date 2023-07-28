@@ -52,7 +52,7 @@ def get_gdp_data(year):
 
     return gdp_data_year
 
-def get_AC_penetration_factor(gdp_data, deg_time_data):
+def get_exposure_factor(gdp_data, deg_time_data):
     """
     Get AC penetration factor for given GDP and cooling degree time
     """
@@ -62,12 +62,15 @@ def get_AC_penetration_factor(gdp_data, deg_time_data):
     availability = 1/(1+np.exp(4.152)*np.exp(-0.237*inflation_factor*gdp_data/1000))
     # Compute AC saturation as a function of cooling degree days
     deg_days = deg_time_data/24
-    saturation = 1.00 - 0.949*np.exp(-0.00187*deg_days)
+    saturation = 1. - 0.949*np.exp(-0.00187*deg_days)
 
-    # Compute AC penetration factor
-    AC_penetration_factor = 1. - (availability * saturation)
+    new_latitude = np.arange(89.5, -90.5, -1)
+    new_longitude = np.arange(-179.5, 180.5, 1)
+    availability = availability.interp(latitude=new_latitude, longitude=new_longitude)
 
-    return AC_penetration_factor
+    exposure_factor = 1. - (availability * saturation)
+
+    return exposure_factor
 
 
 def compute_degree_time(year, era5_path):
@@ -92,9 +95,11 @@ def compute_degree_time(year, era5_path):
             # Make grid coarser and change resolution to 1 degree
             surface_temp = surface_temp.coarsen(latitude=4, longitude=4, boundary='trim').mean()
             # Shift grid to go from -180 to 180 degrees and 90 to -90 degrees
-            surface_temp = surface_temp.assign_coords(longitude=(surface_temp.longitude - 179.875))
+            surface_temp = surface_temp.assign_coords(longitude=([(x + 0.125) for x in surface_temp.longitude.values if x <= 180] + [(x - 359.875) for x in surface_temp.longitude.values if x > 180]))
             surface_temp = surface_temp.assign_coords(latitude=(surface_temp.latitude - 0.125))
-            
+            # Sort grid by longitude
+            surface_temp = surface_temp.sortby(surface_temp.longitude)
+          
             # Compute degree time for each grid cell and each time step
             base_temp = 18.0
             daily_degree_time = None
@@ -106,6 +111,8 @@ def compute_degree_time(year, era5_path):
                     daily_degree_time = degree_time
                 else:
                     daily_degree_time += degree_time
+            # Drop the time attribute
+            daily_degree_time = daily_degree_time.drop('time')
 
             # Sum over all grid cells
             if yearly_degree_time is None:
@@ -187,17 +194,18 @@ def main():
                 for gdp_year in run_gdp_years:
 
                     gdp_data_year = get_gdp_data(gdp_year)
-                    AC_penetration_factor = get_AC_penetration_factor(gdp_data_year, yearly_degree_time)
+                    yearly_deg_time_AC = get_deg_time_data(gdp_year, era5_path)
+                    exposure_factor = get_exposure_factor(gdp_data_year, yearly_deg_time_AC)
 
                     # Multiply degree time grid by population grid and gdp grid
-                    weighted_cdd = yearly_degree_time * pop_data_year * AC_penetration_factor
-
-                    # Compute global average and store in dictionary
-                    global_average = weighted_cdd.mean()
+                    weighted_cdd = yearly_degree_time * pop_data_year * exposure_factor
+      
+                    # Compute global average and store in dictionary    
+                    global_average = weighted_cdd.mean(dim=['latitude', 'longitude'], skipna=True)
                     deg_time_dict["pop{0}_temp{1}_gdp{2}".format(pop_year, temp_year, gdp_year)] = global_average
 
                     # Plot the population weighted cooling degree time for 2015 for all effects separately
-                    if pop_year == 2015 or temp_year == 2015 or gdp_year == 2015:
+                    if pop_year == 2015 or temp_year == 2015 or gdp_year == 2015 or (pop_year == 2000 and temp_year == 2000 and gdp_year == 2000):
                         plot_map(weighted_cdd, pop_year, temp_year, gdp_year)
 
         # Accumulate data in dictionary                
