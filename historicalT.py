@@ -201,7 +201,8 @@ def main():
                     weighted_cdd = yearly_degree_time * pop_data_year * exposure_factor
       
                     # Compute global average and store in dictionary    
-                    global_average = weighted_cdd.mean(dim=['latitude', 'longitude'], skipna=True)
+                    # global_average = weighted_cdd.mean(dim=['latitude', 'longitude'], skipna=True)
+                    global_average = weighted_cdd.sum(dim=['latitude', 'longitude'], skipna=True) / pop_data_year.sum(dim=['latitude', 'longitude'], skipna=True)
                     deg_time_dict["pop{0}_temp{1}_gdp{2}".format(pop_year, temp_year, gdp_year)] = global_average
 
                     # Plot the population weighted cooling degree time for 2015 for all effects separately

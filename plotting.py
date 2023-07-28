@@ -68,10 +68,10 @@ def plot_time_curve(data_dict, plot_years):
     # x tick labels at plot_years
     ax.set_xticks(plot_years)
     ax.set_xlim([plot_years[0], plot_years[-1]])
-    ax.set_ylabel('Population and GDP weighted cooling degree hours, base T=18°C')
+    ax.set_ylabel('Experienced cooling degree hours per person')
     # Dashed horizontal line at reference year
     ax.axhline(data_dict["all_effects"]["pop2000_temp2000_gdp2000"], color='black', linestyle='--')
-    ax.set_title('Effects of population and temperature change on population-weighted cooling degree days', pad=20)
+    ax.set_title('Effects of population, temperature and GDP change on experienced cooling degree hours', pad=20)
 
     # Save the figure
     if not os.path.exists('Figures'):
