@@ -4,15 +4,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from plotting import plot_map, plot_time_curve
 
-#######################################
-# ERA5 data set stored on Caltech server
-
-# Temperature
-# Source: https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-era5-land?tab=overview
-# Resolution: 0.1 degree
-# data on 
-era5_path = '/groups/carnegie_poc/leiduan_memex/lustre_scratch/MERRA2_data/ERA5_original_data/'
-#######################################
 
 def get_pop_data(year):
     """
@@ -48,7 +39,7 @@ def get_gdp_data(year):
     # Drop the time attribute
     gdp_data_year = gdp_data_year.drop('time')
     # Make grid coarser and change resolution to 1 degree
-    gdp_data_year = gdp_data_year.coarsen(latitude=12, longitude=12, boundary='trim').mean()
+    gdp_data_year = gdp_data_year.coarsen(latitude=12, longitude=12, boundary='trim').sum()
 
     return gdp_data_year
 
@@ -117,7 +108,7 @@ def compute_degree_time(year, era5_path):
             surface_temp = temp_dataset['t2m']
 
             # Make grid coarser and change resolution to 1 degree
-            surface_temp = surface_temp.coarsen(latitude=4, longitude=4, boundary='trim').mean()
+            surface_temp = surface_temp.coarsen(latitude=4, longitude=4, boundary='trim').sum()
             # Shift grid to go from -180 to 180 degrees and 90 to -90 degrees
             surface_temp = surface_temp.assign_coords(longitude=([(x + 0.125) for x in surface_temp.longitude.values if x <= 180] + [(x - 359.875) for x in surface_temp.longitude.values if x > 180]))
             surface_temp = surface_temp.assign_coords(latitude=(surface_temp.latitude - 0.125))
@@ -144,88 +135,4 @@ def get_deg_time_data(year, era5_path):
         yearly_degree_time = xr.open_dataset('yearly_deg_time/yearly_degree_time_{0}.nc'.format(year))['t2m']
     return yearly_degree_time
  
-
-#######################################
-# Compute population weighted cooling degree time
-
-def main():
-    """
-    Compute population weighted cooling degree time, separating effects of population and temperature change
-    """
-    all_data_dict = {}
-    all_years = [2000, 2005, 2010, 2015]
-    ref_year = [2000]
-    
-    for case in ["population_effect", "temperature_effect", "gdp_effect", "all_effects"]:
-        print ("case: ", case)
-
-        if case == "population_effect":
-            pop_years = all_years
-            temp_years = ref_year
-            gdp_years = ref_year
-
-        elif case == "temperature_effect":
-            pop_years = ref_year
-            temp_years = all_years
-            gdp_years = ref_year
-
-        elif case == "gdp_effect":
-            pop_years = ref_year
-            temp_years = ref_year
-            gdp_years = all_years
-        
-        else:
-            pop_years = all_years
-            temp_years = "same"
-            gdp_years = "same"
-
-
-        deg_time_dict = {}
-        for pop_year in pop_years:
-
-            # Population data
-            pop_data_year = get_pop_data(pop_year)
-
-            # Temperature to cooling degree time
-            if temp_years == "same":
-                run_temp_years = [pop_year]
-            else:
-                run_temp_years = temp_years
-            for temp_year in run_temp_years:
-
-                # Degree time data
-                yearly_degree_time = get_deg_time_data(temp_year, era5_path)
-
-                if gdp_years == "same":
-                    run_gdp_years = [pop_year]
-                else:
-                    run_gdp_years = gdp_years
-                for gdp_year in run_gdp_years:
-
-                    gdp_data_year = get_gdp_data(gdp_year)
-                    yearly_deg_time_AC = get_deg_time_data(gdp_year, era5_path)
-                    exposure_factor = get_exposure_factor(gdp_data_year, yearly_deg_time_AC)
-
-                    # Multiply degree time grid by population grid and gdp grid
-                    weighted_cdd = yearly_degree_time * pop_data_year * exposure_factor
-      
-                    # Compute global average and store in dictionary    
-                    # global_average = weighted_cdd.mean(dim=['latitude', 'longitude'], skipna=True)
-                    global_average = weighted_cdd.sum(dim=['latitude', 'longitude'], skipna=True) / pop_data_year.sum(dim=['latitude', 'longitude'], skipna=True)
-                    deg_time_dict["pop{0}_temp{1}_gdp{2}".format(pop_year, temp_year, gdp_year)] = global_average
-
-                    # Plot the population weighted cooling degree time for 2015 for all effects separately
-                    if pop_year == 2015 or temp_year == 2015 or gdp_year == 2015 or (pop_year == 2000 and temp_year == 2000 and gdp_year == 2000):
-                        plot_map(weighted_cdd, pop_year, temp_year, gdp_year)
-
-        # Accumulate data in dictionary                
-        all_data_dict[case] = deg_time_dict
-
-    # Plot the time curves for the different effects
-    plot_time_curve(all_data_dict, all_years)
-
-
-if __name__ == '__main__':
-    main()
-
 
