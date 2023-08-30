@@ -16,12 +16,16 @@ def main():
     # Resolution: 0.1 degree
     # data on 
     era5_path = '/groups/carnegie_poc/leiduan_memex/lustre_scratch/MERRA2_data/ERA5_original_data/'
+    futureT_file = '/groups/carnegie_poc/leiduan_memex/shared/tas_day_CanESM5_ssp585_r1i1p1f1_gn_20150101-21001231.nc'
     #######################################
 
     all_data_dict = {}
-    all_years = [2000, 2005, 2010, 2015]
+    all_years = [2000, 2005, 2010, 2015, 2030, 2050, 2100]
     ref_year = [2000]
+    # Grid is 1 deg x 1 deg
+    grid = [[-89.5,90.5],[-179.5,180.5],1]
     
+    ref_year_scenario_run = False
     for case in ["population_effect", "temperature_effect", "gdp_effect", "all_effects"]:
         print ("case: ", case)
 
@@ -50,7 +54,11 @@ def main():
         for pop_year in pop_years:
 
             # Population data
-            pop_data_year = get_pop_data(pop_year)
+            if pop_year < 2020:
+                pop_data_year = get_pop_data(pop_year)
+            else:
+                future_pop_file = 'data_experiencedT/SSP5_population/SSP5_{}.tif'.format(pop_year)
+                pop_data_year = compute_pop_gdp_prediction(future_pop_file, grid)
 
             # Temperature to cooling degree time
             if temp_years == "same":
@@ -60,34 +68,76 @@ def main():
             for temp_year in run_temp_years:
 
                 # Degree time data
-                yearly_degree_time = get_deg_time_data(temp_year, era5_path)
-                print("yearly_degree_time: ", yearly_degree_time.sum(dim=['latitude', 'longitude'], skipna=True))
+                if temp_year < 2020:
+                    yearly_degree_time = get_deg_time_data(temp_year, era5_path)
+                else:
+                    yearly_degree_time = compute_degree_time_prediction(temp_year, futureT_file, grid)
+                
 
                 if gdp_years == "same":
                     run_gdp_years = [pop_year]
                 else:
                     run_gdp_years = gdp_years
+
                 for gdp_year in run_gdp_years:
 
-                    gdp_data_year = get_gdp_data(gdp_year)
-                    yearly_deg_time_AC = get_deg_time_data(gdp_year, era5_path)
+                    if pop_year == ref_year[0] and temp_year == ref_year[0] and gdp_year == ref_year[0]:
+                        if ref_year_scenario_run:
+                            continue
+                        else:
+                            ref_year_scenario_run = True
+
+                    print("pop_year: ", pop_year)
+                    print("temp_year: ", temp_year)
+                    print("gdp_year: ", gdp_year)                            
+                    
+                    if gdp_year < 2020:
+                        gdp_data_year = get_gdp_data(gdp_year)
+                        yearly_deg_time_AC = get_deg_time_data(gdp_year, era5_path)
+                    else:
+                        future_gdp_file = 'data_experiencedT/GDP_SSP5_1km/GDP{}_ssp5.tif'.format(gdp_year)
+                        gdp_data_year = compute_pop_gdp_prediction(future_gdp_file, grid)
+                        yearly_deg_time_AC = compute_degree_time_prediction(gdp_year, futureT_file, grid)
+
+                    # Set all to type float32
+                    modified_arrays = []
+                    for data in [yearly_degree_time, yearly_deg_time_AC, pop_data_year, gdp_data_year]:
+                        data = data.astype(np.float32)
+                        data['latitude'] = data['latitude'].astype(np.float32)
+                        data['longitude'] = data['longitude'].astype(np.float32)
+                        modified_arrays.append(data)
+                    yearly_degree_time, yearly_deg_time_AC, pop_data_year, gdp_data_year = modified_arrays
+                    
+                    # Compute exposure factor
                     exposure_factor = get_exposure_factor(gdp_data_year, yearly_deg_time_AC)
 
                     # Multiply degree time grid by population grid and gdp grid
                     weighted_cdd = yearly_degree_time * pop_data_year * exposure_factor
+                    # print("weighted_cdd", weighted_cdd)
+                    
+                    # Set 0 to NaN
+                    weighted_cdd = weighted_cdd.where(weighted_cdd != 0)
+
+                    # Save yearly degree time for 2030
+                    if temp_year == 2030 and pop_year == 2030 and gdp_year == 2030:
+                        weighted_cdd.to_netcdf('data_experiencedT/weighted_cdd_2030.nc')
       
                     # Compute global average and store in dictionary    
                     # global_average = weighted_cdd.mean(dim=['latitude', 'longitude'], skipna=True)
                     global_average = weighted_cdd.sum(dim=['latitude', 'longitude'], skipna=True) / pop_data_year.sum(dim=['latitude', 'longitude'], skipna=True)
                     deg_time_dict["pop{0}_temp{1}_gdp{2}".format(pop_year, temp_year, gdp_year)] = global_average
+                    # print("global_average", global_average)
 
                     # Plot the population weighted cooling degree time for 2015 for all effects separately
-                    if pop_year == 2015 or temp_year == 2015 or gdp_year == 2015 or (pop_year == 2000 and temp_year == 2000 and gdp_year == 2000):
+                    if pop_year == 2100 or temp_year == 2100 or gdp_year == 2100 or (pop_year == 2000 and temp_year == 2000 and gdp_year == 2000):
                         plot_map(weighted_cdd, pop_year, temp_year, gdp_year)
 
         # Accumulate data in dictionary                
         all_data_dict[case] = deg_time_dict
 
+    # Copy reference year data to all cases
+    for case in ["temperature_effect", "gdp_effect", "all_effects"]:
+        all_data_dict[case]["pop2000_temp2000_gdp2000"] = all_data_dict["population_effect"]["pop2000_temp2000_gdp2000"]
     # Plot the time curves for the different effects
     plot_time_curve(all_data_dict, all_years)
 

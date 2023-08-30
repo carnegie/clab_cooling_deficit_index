@@ -39,11 +39,11 @@ def get_gdp_data(year):
     # Drop the time attribute
     gdp_data_year = gdp_data_year.drop('time')
     # Make grid coarser and change resolution to 1 degree
-    gdp_data_year = gdp_data_year.coarsen(latitude=12, longitude=12, boundary='trim').sum()
+    gdp_data_year = gdp_data_year.coarsen(latitude=12, longitude=12, boundary='trim').mean()
 
     return gdp_data_year
 
-def get_exposure_factor(gdp_data, deg_time_data):
+def get_exposure_factor(gdp_data, deg_days):
     """
     Get AC penetration factor for given GDP and cooling degree time
     """
@@ -52,14 +52,17 @@ def get_exposure_factor(gdp_data, deg_time_data):
     inflation_factor = 0.68
     availability = 1/(1+np.exp(4.152)*np.exp(-0.237*inflation_factor*gdp_data/1000))
     # Compute AC saturation as a function of cooling degree days
-    deg_days = deg_time_data/24
     saturation = 1. - 0.949*np.exp(-0.00187*deg_days)
 
     new_latitude = np.arange(89.5, -90.5, -1)
     new_longitude = np.arange(-179.5, 180.5, 1)
-    availability = availability.interp(latitude=new_latitude, longitude=new_longitude)
+    availability = availability.interp(longitude=new_longitude, latitude=new_latitude)
 
     exposure_factor = 1. - (availability * saturation)
+
+    exposure_factor = exposure_factor.astype(np.float32)
+    exposure_factor['latitude'] = exposure_factor['latitude'].astype(np.float32)
+    exposure_factor['longitude'] = exposure_factor['longitude'].astype(np.float32)
 
     return exposure_factor
 
@@ -68,23 +71,33 @@ def get_yearly_degree_time(surface_temp, yearly_degree_time, base_temp = 18.0):
     Compute yearly degree time
     """
     # Compute degree time for each grid cell and each time step
-    daily_degree_time = None
-    for i in range(len(surface_temp.time)):
-        degree_time = surface_temp[i, :, :] - (base_temp + 273.15)
+
+    # Loop over year if all days contained in one file (for projections)
+    if hasattr(surface_temp, 'time'):
+        
+        degree_days = None
+        for i in range(len(surface_temp.time)):
+            degree_time = surface_temp[i, :, :] - (base_temp + 273.15)
+            # Set all negative values to zero
+            degree_time = degree_time.where(degree_time > 0, 0)
+            if degree_days is None:
+                degree_days = degree_time
+            else:
+                degree_days += degree_time
+        # Drop the time attribute
+        degree_days = degree_days.drop('time')
+    # Each day separate file (for historical data)
+    else:
+        degree_days = surface_temp - (base_temp + 273.15)
         # Set all negative values to zero
-        degree_time = degree_time.where(degree_time > 0, 0)
-        if daily_degree_time is None:
-            daily_degree_time = degree_time
-        else:
-            daily_degree_time += degree_time
-    # Drop the time attribute
-    daily_degree_time = daily_degree_time.drop('time')
+        degree_days = degree_days.where(degree_days > 0, 0)
+        # print("Daily deg day historical", degree_days.sum(dim=['latitude', 'longitude'], skipna=True))
 
     # Sum over all grid cells
     if yearly_degree_time is None:
-        yearly_degree_time = degree_time
+        yearly_degree_time = degree_days
     else:
-        yearly_degree_time += degree_time
+        yearly_degree_time += degree_days
     
     return yearly_degree_time
 
@@ -108,7 +121,7 @@ def compute_degree_time(year, era5_path):
             surface_temp = temp_dataset['t2m']
 
             # Make grid coarser and change resolution to 1 degree
-            surface_temp = surface_temp.coarsen(latitude=4, longitude=4, boundary='trim').sum()
+            surface_temp = surface_temp.coarsen(latitude=4, longitude=4, boundary='trim').mean()
             # Shift grid to go from -180 to 180 degrees and 90 to -90 degrees
             surface_temp = surface_temp.assign_coords(longitude=([(x + 0.125) for x in surface_temp.longitude.values if x <= 180] + [(x - 359.875) for x in surface_temp.longitude.values if x > 180]))
             surface_temp = surface_temp.assign_coords(latitude=(surface_temp.latitude - 0.125))
@@ -116,6 +129,8 @@ def compute_degree_time(year, era5_path):
             surface_temp = surface_temp.sortby(surface_temp.longitude)
           
             # Compute degree time for each day
+            # Get daily mean temperature
+            surface_temp = surface_temp.mean(dim='time', skipna=True)
             yearly_degree_time = get_yearly_degree_time(surface_temp, yearly_degree_time)
     
     return yearly_degree_time
