@@ -11,7 +11,7 @@ The environment can be set up using conda. To create the environment, run
 ## Running main script
 The main script is run by doing
 
-```python historicalT.py```
+```python weighted_deg_time.py```
 
 ### Other scripts
 The script ```AC_penetration.ipynb``` holds an interactive jupyter notebook to illustrate the estimated AC penetration as a function of cooling degree days and GDP per capita.
