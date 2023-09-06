@@ -10,12 +10,17 @@ def compute_degree_time_prediction(year, T_file, grid):
     futureT = xr.open_dataset(T_file)['tas']
     futureT = futureT.sel(time=futureT['time.year'] == year)
     futureT = futureT.rename({'lon': 'longitude', 'lat': 'latitude'})
+    
+    # Shift from 0-360 to -180-180
+    futureT = futureT.assign_coords(longitude=(((futureT.longitude + 178.6) % 360) - 180)).sortby('longitude')
+    
     # Regrid
     ds_out = xr.Dataset({"longitude": (["longitude"], np.arange(grid[1][0], grid[1][1], grid[2])),
-                         "latitude": (["latitude"], np.arange(grid[0][0], grid[0][1], grid[2])),})
+                         "latitude": (["latitude"], np.arange(grid[0][0], grid[0][1], grid[2])),})     
+
     regridder = xe.Regridder(futureT, ds_out, "bilinear")
     futureT = regridder(futureT)
-   
+
     yearly_deg_time = get_yearly_degree_time(futureT, None)
     yearly_deg_time = yearly_deg_time.transpose("latitude", "longitude")
 
@@ -24,8 +29,6 @@ def compute_degree_time_prediction(year, T_file, grid):
 
     return yearly_deg_time
     
-
-
 
 def compute_pop_gdp_prediction(filename, grid):
     """
@@ -37,12 +40,8 @@ def compute_pop_gdp_prediction(filename, grid):
     future_val_ds = future_val.to_dataset(name='val')
     future_val = future_val_ds.rename({'x': 'longitude', 'y': 'latitude'})
     
-    if "population" in filename:
-        future_val = future_val.coarsen(latitude=120, longitude=120, boundary='trim').sum()
-    elif "GDP" in filename:
-        future_val = future_val.coarsen(latitude=120, longitude=120, boundary='trim').mean()
-    else:
-        raise ValueError("Unknown file type: {}".format(filename))
+    # Regrid
+    future_val = future_val.coarsen(latitude=120, longitude=120, boundary='trim').sum()
 
     # Create new latitude values
     new_lat_values = np.arange(89.5, -90.5, -1.)

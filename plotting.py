@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-def plot_map(pop_weighted_cdd, pop_year, temp_year, gdp_year):
+def plot_map(pop_weighted_cdd, pop_year, temp_year, gdp_year, control=None):
     """
     Plot the population weighted cooling degree days
     """
@@ -15,7 +15,24 @@ def plot_map(pop_weighted_cdd, pop_year, temp_year, gdp_year):
     # Plot the data
     # Use imshow to plot the data with the latitude values on the y-axis and longitude values on the x-axis
     # color bar same height as plot
-    pop_plot = ax.imshow(pop_weighted_cdd, origin='lower', extent=[-180, 180, 90, -90], cmap='coolwarm', norm=LogNorm(vmin=1e6, vmax=3e9))
+    if control == None:
+        min, max = 1e6, 3e9
+        pop_plot = ax.imshow(pop_weighted_cdd, origin='lower', extent=[-180, 180, 90, -90], cmap='coolwarm', norm=LogNorm(vmin=min, vmax=max))
+    else:
+        if control == 'degree_time':
+            min, max = 0, 8000
+        elif control == 'population':
+            min, max = 0, 5e6
+        elif control == 'gdp':
+            min, max = 0, 1.5e5
+        elif control == 'exposure_factor':
+            min, max = 0, 1
+        elif control == 'degree_time*exposure_factor':
+            min, max = 0, 8000
+        else:
+            raise ValueError("Unknown plot type ", control)
+        pop_plot = ax.imshow(pop_weighted_cdd, origin='lower', extent=[-180, 180, 90, -90], cmap='coolwarm', vmin=min, vmax=max)
+
     # Add a colorbar 
     # Create an axes on the right side of ax. The width of cax will be 5%
     # of ax and the padding between cax and ax will be fixed at 0.05 inch.
@@ -24,8 +41,22 @@ def plot_map(pop_weighted_cdd, pop_year, temp_year, gdp_year):
 
     # Add a colorbar in the created axes
     cbar = plt.colorbar(pop_plot, cax=cax, orientation='vertical')
-    cbar.set_label('Population and GDP weighted degree days')
-    
+    if control == None:
+        cbar.set_label('Population and GDP weighted degree days')
+    else:
+        if control == 'degree_time':
+            unit = 'cooling degree days'
+        elif control == 'population':
+            unit = 'No. of people'
+        elif control == 'gdp':
+            unit = 'GDP per capita'
+        elif control == 'exposure_factor':
+            unit = '% of population exposed to heat'
+        elif control == 'degree_time*exposure_factor':
+            unit = 'cooling degree days'
+        else:
+            raise ValueError("control should be 'degree_time', 'population', 'gdp' or 'exposure_factor'")
+        cbar.set_label(unit)
     # Flip the y-axis so that 0 is at the top
     ax.invert_yaxis()
 
@@ -35,13 +66,19 @@ def plot_map(pop_weighted_cdd, pop_year, temp_year, gdp_year):
     ax.set_ylabel('Latitude (°N)')
 
     # Set the title of the plot
-    ax.set_title('Population and GDP weighted cooling degree days for the Year pop {0}, temp {1}, gdp {2}'.format(pop_year, temp_year, gdp_year), pad=20)
-
+    if control == None:
+        ax.set_title('Population and GDP weighted cooling degree days for the Year pop {0}, temp {1}, gdp {2}'.format(pop_year, temp_year, gdp_year), pad=20)
+    else:
+        ax.set_title('{0} for year {1}'.format(control, pop_year), pad=20)
     # Save the figure
     if not os.path.exists('Figures'):
         os.makedirs('Figures')
-    plt.savefig('Figures/population_degree_days_{0}_{1}_{2}.png'.format(pop_year, temp_year, gdp_year))
-
+    if control == None:
+        plt.savefig('Figures/population_degree_days_{0}_{1}_{2}.png'.format(pop_year, temp_year, gdp_year))
+    else:
+        if not os.path.exists('Figures/control_plots'):
+            os.makedirs('Figures/control_plots')
+        plt.savefig('Figures/control_plots/{0}_{1}.png'.format(control, pop_year))
 
 def plot_time_curve(data_dict, plot_years):
     """
@@ -58,14 +95,13 @@ def plot_time_curve(data_dict, plot_years):
     gdp_effect = [data_dict["gdp_effect"]["pop2000_temp2000_gdp{0}".format(year)] for year in plot_years]
     all_effects = [data_dict["all_effects"]["pop{0}_temp{0}_gdp{0}".format(year, year)] for year in plot_years]
 
-    # print("pop_effect", pop_effect)
-    # print("temp_effect", temp_effect)
-    # print("gdp_effect", gdp_effect)
-    # print("all_effects", all_effects)
     ax.plot(plot_years, pop_effect, label='Population effect')
     ax.plot(plot_years, temp_effect, label='Temperature effect')
     ax.plot(plot_years, gdp_effect, label='GDP effect/AC penetration')
-    ax.plot(plot_years, all_effects, label='All effects')
+    ax.plot(plot_years, all_effects, label='All effects', color='black')
+
+    # Dashed horizontal line at reference year
+    ax.axhline(data_dict["all_effects"]["pop2000_temp2000_gdp2000"], color='grey', linestyle='--', label='Reference year 2000')
 
     # Add a legend
     ax.legend()
@@ -74,8 +110,6 @@ def plot_time_curve(data_dict, plot_years):
     ax.set_xticks(plot_years)
     ax.set_xlim([plot_years[0], plot_years[-1]])
     ax.set_ylabel('Experienced cooling degree days per person')
-    # Dashed horizontal line at reference year
-    ax.axhline(data_dict["all_effects"]["pop2000_temp2000_gdp2000"], color='black', linestyle='--')
     ax.set_title('Effects of population, temperature and GDP change on experienced cooling degree days', pad=20)
 
     # Save the figure

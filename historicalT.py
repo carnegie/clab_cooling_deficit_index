@@ -43,13 +43,17 @@ def get_gdp_data(year):
 
     return gdp_data_year
 
-def get_exposure_factor(gdp_data, deg_days):
+def get_exposure_factor(gdp_data, deg_days, gdp_year):
     """
     Get AC penetration factor for given GDP and cooling degree time
     """
     # Compute availability as a function of GDP
-    # Factor 0.68 between 1995 USD and 2011 USD
-    inflation_factor = 0.68
+    # Factor 0.68 between 1995 USD and 2011 USD: Function derived with 1995 dollars and historical data in 2011 dollars
+    if gdp_year < 2020:
+        inflation_factor = 0.68
+    else:
+        # Predictions of GDP are in 2005 dollars
+        inflation_factor = 0.78
     availability = 1/(1+np.exp(4.152)*np.exp(-0.237*inflation_factor*gdp_data/1000))
     # Compute AC saturation as a function of cooling degree days
     saturation = 1. - 0.949*np.exp(-0.00187*deg_days)
@@ -91,7 +95,6 @@ def get_yearly_degree_time(surface_temp, yearly_degree_time, base_temp = 18.0):
         degree_days = surface_temp - (base_temp + 273.15)
         # Set all negative values to zero
         degree_days = degree_days.where(degree_days > 0, 0)
-        # print("Daily deg day historical", degree_days.sum(dim=['latitude', 'longitude'], skipna=True))
 
     # Sum over all grid cells
     if yearly_degree_time is None:
