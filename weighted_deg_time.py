@@ -1,22 +1,24 @@
 from futureT import *
 from historicalT import *
 from plotting import *
+import yaml
 
 def main():
     """
     Compute population weighted cooling degree time, separating effects of population and temperature change
     """
 
-    # Path to ERA5 data; change this to the path on your machine
+    # Load config file
+    with open("config.yaml", 'r') as ymlfile:
+        config = yaml.load(ymlfile, Loader=yaml.FullLoader)
     #######################################
-    # ERA5 data set stored on Caltech server
+    # ERA5 data set
 
-    # Temperature
+    # Temperature at 2m
     # Source: https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-era5-land?tab=overview
-    # Resolution: 0.1 degree
-    # data on 
-    era5_path = '/groups/carnegie_poc/leiduan_memex/lustre_scratch/MERRA2_data/ERA5_original_data/'
-    futureT_file = '/groups/carnegie_poc/leiduan_memex/shared/tas_day_CanESM5_ssp585_r1i1p1f1_gn_20150101-21001231.nc'
+    # Resolution: 0.25 degree
+    era5_path = config['era5_path']
+    futureT_file = config['cmip6_path']
     #######################################
 
     all_data_dict = {}
@@ -58,7 +60,7 @@ def main():
             if pop_year < 2020:
                 pop_data_year = get_pop_data(pop_year)
             else:
-                future_pop_file = 'data_experiencedT/SSP5_population/SSP5_{}.tif'.format(pop_year)
+                future_pop_file = config['pop_path'] + 'SSP5_{}.tif'.format(pop_year)
                 pop_data_year = compute_pop_gdp_prediction(future_pop_file, grid)
 
             # Temperature to cooling degree time
@@ -97,10 +99,10 @@ def main():
                         yearly_deg_time_AC = get_deg_time_data(gdp_year, era5_path)
                         pop_data_year_AC = get_pop_data(gdp_year)
                     else:
-                        future_gdp_file = 'data_experiencedT/GDP_SSP5_1km/GDP{}_ssp5.tif'.format(gdp_year)
+                        future_gdp_file = config['gdp_path'] + 'GDP{}_ssp5.tif'.format(gdp_year)
                         gdp_data_year = compute_pop_gdp_prediction(future_gdp_file, grid)
                         yearly_deg_time_AC = compute_degree_time_prediction(gdp_year, futureT_file, grid)
-                        future_pop_file_AC = 'data_experiencedT/SSP5_population/SSP5_{}.tif'.format(gdp_year)
+                        future_pop_file_AC = config['pop_path'] + 'SSP5_{}.tif'.format(gdp_year)
                         pop_data_year_AC = compute_pop_gdp_prediction(future_pop_file_AC, grid)
 
                     # Set all to type float32
@@ -131,7 +133,6 @@ def main():
                     # Compute global average and store in dictionary    
                     global_average = weighted_cdd.sum(dim=['latitude', 'longitude'], skipna=True) / pop_data_year.sum(dim=['latitude', 'longitude'], skipna=True)
                     deg_time_dict["pop{0}_temp{1}_gdp{2}".format(pop_year, temp_year, gdp_year)] = global_average
-                    print("global_average: ", global_average)
 
                     # Plot the population weighted cooling degree time for 2015 for all effects separately
                     if pop_year == 2100 or temp_year == 2100 or gdp_year == 2100 or (pop_year == 2000 and temp_year == 2000 and gdp_year == 2000):

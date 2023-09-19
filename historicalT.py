@@ -113,10 +113,10 @@ def compute_degree_time(year, era5_path):
         month = str(month).zfill(2)
         for day in range(1, 32):
             day = str(day).zfill(2)
-            if not os.path.exists(os.path.join(era5_path, 'ERA5_{0}_{1}_{2}.nc'.format(year, month, day))):
+            if not os.path.exists(os.path.join(era5_path, 'ERA5Water_{0}_{1}_{2}.nc'.format(year, month, day))):
                 continue
                 
-            era5_file = os.path.join(era5_path, 'ERA5_{0}_{1}_{2}.nc'.format(year, month, day))
+            era5_file = os.path.join(era5_path, 'ERA5Water_{0}_{1}_{2}.nc'.format(year, month, day))
             # Open the NetCDF file
             temp_dataset = xr.open_dataset(era5_file)
 

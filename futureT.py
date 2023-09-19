@@ -34,14 +34,23 @@ def compute_pop_gdp_prediction(filename, grid):
     """
     Compute population and GDP prediction for a given year
     """
-    future_val = rxr.open_rasterio(filename)
-    # Set nodata values to NaN
+
+    # Chunked Processing with Dask:
+    chunk_size = 4800
+    future_val = rxr.open_rasterio(filename, chunks={'band': 1, 'x': chunk_size, 'y': chunk_size})
+
+    # Set nodata values to NaN:
     future_val = future_val.where(future_val != future_val.rio.nodata)
+
+    # Convert to Dataset and Rename Dimensions:
     future_val_ds = future_val.to_dataset(name='val')
     future_val = future_val_ds.rename({'x': 'longitude', 'y': 'latitude'})
-    
-    # Regrid
+
+    # Coarsening:
     future_val = future_val.coarsen(latitude=120, longitude=120, boundary='trim').sum()
+
+    # Compute and Save:
+    future_val = future_val.compute()  # Trigger computation
 
     # Create new latitude values
     new_lat_values = np.arange(89.5, -90.5, -1.)
