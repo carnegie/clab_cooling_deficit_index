@@ -13,7 +13,7 @@ def compute_degree_time_prediction(year, T_file, grid):
     
     # Shift from 0-360 to -180-180
     futureT = futureT.assign_coords(longitude=(((futureT.longitude + 178.6) % 360) - 180)).sortby('longitude')
-    
+
     # Regrid
     ds_out = xr.Dataset({"longitude": (["longitude"], np.arange(grid[1][0], grid[1][1], grid[2])),
                          "latitude": (["latitude"], np.arange(grid[0][0], grid[0][1], grid[2])),})     
