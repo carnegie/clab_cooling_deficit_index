@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+import seaborn as sns
 
 
 def read_ac_data(data_file):
@@ -133,7 +135,7 @@ def exposure_contour(exposure_function, ac_data, multiply_cdd=False, add_data=Tr
     plt.savefig('Figures/exposure_funct_analysis/{0}.png'.format(name_tag), dpi=300)
 
 
-def plot_gdp_const_warming(gdp_cdd_data, geo_df, ssp_scenario, rcp_scenario):
+def plot_gdp_increase_map(gdp_cdd_data, geo_df, ssp_scenario, rcp_scenario):
     """
     Plot difference in exposure times CDD as a function of GDP per capita
     """
@@ -142,38 +144,48 @@ def plot_gdp_const_warming(gdp_cdd_data, geo_df, ssp_scenario, rcp_scenario):
     gdp_data = gdp_data.rename(columns={'GDP': 'GDP_1980'})
     # Merge with AC data
     gdp_cdd_data = pd.merge(gdp_cdd_data, gdp_data, left_on='ISO3', right_index=True)
-    gdp_cdd_data['gdp_historical_factor'] = gdp_cdd_data['GDP']/gdp_cdd_data['GDP_1980']
+    gdp_cdd_data['gdp_historical_factor'] = ( (gdp_cdd_data['GDP'] - gdp_cdd_data['GDP_1980']) / (2018 - 1980) ) / gdp_cdd_data['GDP_1980']
     
-    fig, ax = plt.subplots(figsize=(10, 5))
-    geo_df['gdp_development'] = gdp_cdd_data['gdp_const']/gdp_cdd_data['gdp_historical_factor']
-    geo_df.plot(column='gdp_development', ax=ax, legend=True, cmap='inferno', vmin=0, vmax=5, legend_kwds={'label': 'GDP increase relative to historical'})
+    fig, ax = plt.subplots(2, 1, figsize=(10, 5))
+    geo_df['gdp_const'] = gdp_cdd_data['gdp_const']
+
+    geo_df['gdp_historical_factor'] = gdp_cdd_data['gdp_historical_factor']
+    # color bar in log scale
+    geo_df.plot(column='gdp_const', ax=ax[0], legend=True, cmap='inferno_r',
+            norm=mcolors.LogNorm(vmin=1e-2, vmax=1),
+            legend_kwds={'label': 'Annual GDP to balance\nwarming in 2100'})
+    geo_df.plot(column='gdp_historical_factor', ax=ax[1], legend=True, cmap='inferno_r', 
+            norm=mcolors.LogNorm(vmin=1e-2, vmax=1),
+            legend_kwds={'label': 'Annual historical GDP'})
+    plt.legend()
     plt.savefig('Figures/exposure_funct_analysis/gdp_const_ssp_{0}_rcp_{1}_map.png'.format(ssp_scenario, rcp_scenario), dpi=300)
+    return gdp_cdd_data
 
-
+def plot_gdp_increase_scatter(gdp_cdd_data, ssp_scenario, rcp_scenario):
+    """
+    Plot difference in exposure times CDD as a function of GDP per capita
+    """
     # New figure
     plt.figure()
     # Make a selection of countries
-    countries = ['CHN', 'MEX', 'BRA', 'SAU', 'IND', 'IDN', 'ZAF', 'USA', 'KOR', 'JPN', 'GER', 'EGY', 'KEN', 'NGA', 'RUS', 'ZMB', 'ISL']
-    ac_data_new_plot = gdp_cdd_data[gdp_cdd_data['ISO3'].isin(countries)]
+    # countries = ['CHN', 'MEX', 'BRA', 'SAU', 'IND', 'IDN', 'ZAF', 'USA', 'KOR', 'JPN', 'GER', 'EGY', 'KEN', 'NGA', 'RUS', 'ZMB', 'ISL']
+    ac_data_new_plot = gdp_cdd_data
     ac_data_new_plot = ac_data_new_plot.reset_index()
     
     
-    plt.scatter(ac_data_new_plot['diff_cdd'], ac_data_new_plot['gdp_const']/ac_data_new_plot['gdp_historical_factor'], label='SSP{0} RCP {1}, 2018-2100'.format(ssp_scenario, int(rcp_scenario)/10))
-    plt.xlabel('CDD 2100 - CDD 2018'.format(ssp_scenario, int(rcp_scenario)/10))
+    plt.scatter(ac_data_new_plot['gdp_historical_factor']*100, ac_data_new_plot['gdp_const']*100, label='SSP{0} RCP {1}, 2018-2100'.format(ssp_scenario, int(rcp_scenario)/10), s=8, c='black')
+    plt.xlabel('Average historical GDP growth (annual %)')
     # plt.ylabel(r'$\frac{ \mathrm{GDP \ needed \ to \ keep \ exposure \ times \ CDD \ constant}}{\mathrm{2018 \ GDP}}$')
-    plt.ylabel('GDP increase needed to keep exposure times CDD constant 2018-2100\n divided by historical GDP increase 1980-2018')
+    plt.ylabel('Average GDP growth for constant experienced CDD (annual %)')
 
     # plt.scatter(ac_data_new_plot['diff_cdd'], ac_data_new_plot['gdp_historical_factor'], c='cyan', label='Historic GDP growth, 1980-2018')
 
-
-    # Label each point with country name
-    gdp_dev = ac_data_new_plot['gdp_const']/ac_data_new_plot['gdp_historical_factor']
+    # Label each point with country name if it has a value that is not NaN
     for i, txt in enumerate(ac_data_new_plot['ISO3'].values):
-        plt.annotate(txt, (ac_data_new_plot['diff_cdd'][i]+0.5, gdp_dev[i]), fontsize=8)
-        # plt.annotate(txt, (ac_data_new_plot['diff_cdd'][i]+10, ac_data_new_plot['gdp_historical_factor'][i]), fontsize=8)
-
-    # Horizontal dashed line at 1
-    plt.axhline(y=1, color='k', linestyle='--')
+        if not np.isnan(ac_data_new_plot['gdp_const'][i]) and not np.isnan(ac_data_new_plot['gdp_historical_factor'][i]):
+            plt.annotate(txt, (ac_data_new_plot['gdp_historical_factor'][i]*100, ac_data_new_plot['gdp_const'][i]*100), fontsize=7)
+    # Dashed diagonal line
+    plt.plot([0, 1], [0, 1], 'k--')
 
     # plt.legend()
     plt.savefig('Figures/exposure_funct_analysis/gdp_const_ssp_{0}_rcp_{1}_vsCDDdiff.png'.format(ssp_scenario, rcp_scenario), dpi=300)
