@@ -3,7 +3,7 @@ import geopandas as gpd
 import country_converter as coco
 import numpy as np
 import pandas as pd
-from utilities import exposure_new, read_gdp_data, gdp_from_cdd_exposure
+from utilities.utilities import exposure_new, read_gdp_data, gdp_from_cdd_exposure
 
 def plot_exposure_map(ac_data_historical):
     # Plot exposure map
