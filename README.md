@@ -1,19 +1,29 @@
 # Repository for experienced temperature project
 
+## Cloning the repository
+To clone the repository, run
+
+```git clone https://github.com/carnegie/clab_experiencedT.git```
+
+and then
+
+```cd clab_experiencedT```.
+
 ## Data
-The script is using the ERA5 temperature data downloaded by Lei to the Caltech server, so it's currently set up to run there. All other data is in this repository.
+Most data is from the World Bank and can be downloaded from data.worldbank.org.
+
+The data for the CDD predictions is from https://github.com/marina-andrijevic/coolinggap.
 
 ## Setting up the environment
 The environment can be set up using conda. To create the environment, run
 
 ```conda env create -f env.yml```.
 
+Then activate the environment by running
+
+```conda activate experiencedT_env```.
+
 ## Running main script
-The main script is run by doing
+The main script for creating all plots is the interactive jupyter notebook ```experienced_cdd_predictions.ipynb```.
 
-```python weighted_deg_time.py```
-
-### Other scripts
-The script ```AC_penetration.ipynb``` holds an interactive jupyter notebook to illustrate the estimated AC penetration as a function of cooling degree days and GDP per capita.
-
-The script ```experiencedT.ipynb``` holds some first calculations for this project and is currently abandoned.
+The underlying exposure function is derived in ```derive_exposure_function.ipynb``` (this is not required to run the main script but shows the derivation of the assumptions used in the main script).
