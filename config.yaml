@@ -1,5 +1,20 @@
 # Configuration settings
 
-future_year: 2100
+# Years
+future_years: 
+  - 2040
+  - 2060
+  - 2080
+  - 2100
 ref_year: 2018
 past_year: 1980
+
+# Scenarios
+future_scenarios: 
+  - 'ssp1_rcp26'
+  - 'ssp2_rcp45'
+  - 'ssp5_rcp60' # don't have data higher than RCP 6.0
+
+# Files
+cdd_projections_file: 'data_experiencedT/projections/ISO_CDD_GDP18_agg_data.csv'
+gdp_projections_file: 'data_experiencedT/projections/gdp_edu_projections.csv'

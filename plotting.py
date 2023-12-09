@@ -1,116 +1,208 @@
-# Plotting scripts for experienced temperature project
-
-import os
 import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+import geopandas as gpd
+import country_converter as coco
+import numpy as np
+import pandas as pd
+from utilities import exposure_new, read_gdp_data, gdp_from_cdd_exposure
 
-def plot_map(pop_weighted_cdd, pop_year, temp_year, control=None):
-    """
-    Plot the population weighted cooling degree days
-    """
-    # Create a figure and axis for the plot
-    fig, ax = plt.subplots(figsize=(10, 5))
+def plot_exposure_map(ac_data_historical):
+    # Plot exposure map
+    # Load world geometries
+    world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
+    # Copy your data
+    ac_data_map = ac_data_historical.copy()
+    # Convert ISO3 codes in your data to match the world dataframe
+    cc = coco.CountryConverter()
+    ac_data_map['ISO3'] = cc.convert(names=ac_data_map['ISO3'].values.tolist(), to='ISO3', not_found=None)
+    # Merge your data with the world geometries
+    merged_data = ac_data_map.merge(world[['geometry', 'iso_a3']], left_on='ISO3', right_on='iso_a3', how='left')
+    # Convert the merged data to a GeoDataFrame
+    ac_data_map_geo = gpd.GeoDataFrame(merged_data, geometry='geometry')
 
+    ac_data_map_geo['exposure_calculated'] = exposure_new(ac_data_map_geo['GDP'], ac_data_map_geo['DD_mean'])
     # Plot the data
-    # Use imshow to plot the data with the latitude values on the y-axis and longitude values on the x-axis
-    # color bar same height as plot
-    if control == None:
-        min, max = 1e5, 1e10
-        pop_plot = ax.imshow(pop_weighted_cdd, origin='lower', extent=[-180, 180, 90, -90], cmap='viridis', norm=LogNorm(vmin=min, vmax=max))
-    else:
-        if control == 'degree_time':
-            min, max = 0, 8000
-        elif control == 'population':
-            min, max = 0, 5e6
-        elif control == 'gdp':
-            min, max = 0, 1.5e5
-        elif control == 'exposure_factor':
-            min, max = 0., 100.
-            pop_weighted_cdd = pop_weighted_cdd * 100
-        elif control == 'degree_time*exposure_factor':
-            min, max = 0, 8000
-        else:
-            raise ValueError("Unknown plot type ", control)
-        pop_plot = ax.imshow(pop_weighted_cdd, origin='lower', extent=[-180, 180, 90, -90], cmap='inferno', vmin=min, vmax=max)
+    fig, ax = plt.subplots(figsize=(10, 5))
+    # Plot the data
+    ac_data_map_geo.plot(column='exposure_calculated', ax=ax, cmap='viridis', vmin=0, vmax=1)
 
-    # Add a colorbar 
-    # Create an axes on the right side of ax. The width of cax will be 5%
-    # of ax and the padding between cax and ax will be fixed at 0.05 inch.
+    # Color bar same height as map
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
     divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="2%", pad=0.05)
+    cax = divider.append_axes("right", size="3.5%", pad=0.1)
+    plt.colorbar(ax.collections[0], cax=cax, label='Exposure')
+    
+    # Remove axes ticks
+    ax.set_xticks([])
+    ax.set_yticks([])
 
-    # Add a colorbar in the created axes
-    cbar = plt.colorbar(pop_plot, cax=cax, orientation='vertical')
-    if control == None:
-        cbar.set_label('Population weighted degree days')
-    else:
-        if control == 'degree_time':
-            unit = 'cooling degree days'
-        elif control == 'population':
-            unit = 'No. of people'
-        elif control == 'gdp':
-            unit = 'GDP per capita'
-        elif control == 'exposure_factor':
-            unit = '% of population exposed to heat'
-        elif control == 'degree_time*exposure_factor':
-            unit = 'cooling degree days'
-        else:
-            raise ValueError("control should be 'degree_time', 'population', 'gdp' or 'exposure_factor'")
-        cbar.set_label(unit)
-    # Flip the y-axis so that 0 is at the top
-    ax.invert_yaxis()
+    plt.savefig('Figures/exposure_map.png', dpi=300)
 
+    return ac_data_map_geo
 
-    # Set the labels for the x and y axes
-    ax.set_xlabel('Longitude (°E)')
-    ax.set_ylabel('Latitude (°N)')
-
-    # Set the title of the plot
-    if control == None:
-        ax.set_title('Population weighted cooling degree days for the Year pop {0}, temp {1}'.format(pop_year, temp_year), pad=20)
-    else:
-        ax.set_title('{0} for year {1}'.format(control, pop_year), pad=20)
-    # Save the figure
-    if not os.path.exists('Figures'):
-        os.makedirs('Figures')
-    if control == None:
-        plt.savefig('Figures/population_degree_days_{0}_{1}.png'.format(pop_year, temp_year))
-    else:
-        if not os.path.exists('Figures/control_plots'):
-            os.makedirs('Figures/control_plots')
-        plt.savefig('Figures/control_plots/{0}_{1}.png'.format(control, pop_year))
-
-def plot_time_curve(data_dict, plot_years):
+def plot_exposure_contour(configurations, exposure_function, ac_data, add_data=True, name_tag='exposure_contour'):
     """
-    Plot all curves in one plot to show the effect of population and temperature on cooling degree days
+    Conntour plot of penetration of air conditioning as a function of GDP per capita and cooling degree days
     """
-    # Create a figure and axis for the plot
-    fig, ax = plt.subplots(figsize=(10, 5))
-    # Show x labels as integers
-    ax.xaxis.set_major_locator(plt.MaxNLocator(5))
+    plt.figure()
+    if not "NGA" in name_tag:
+        cdd_x = np.linspace(100, 5000, 100)
+        gdp_x = np.linspace(0, 200000, 100)
+        cdd_x, gdp_x = np.meshgrid(cdd_x, gdp_x)
+        contour_function = exposure_function(gdp_x, cdd_x)*cdd_x
+        plt.xscale('log')
+        
+        plt.xlabel('GDP per capita in 2018 USD')
+        plt.ylabel('Cooling degree days')
+        color_map = 'YlOrRd'
+    else:
+        cdd_x = np.linspace(0, 0.5, 100)
+        gdp_x = np.linspace(0, .05, 100)
+        cdd_x, gdp_x = np.meshgrid(cdd_x, gdp_x)
+        # Get GDP for NGA
+        gdp_NGA = ac_data[ac_data['ISO3']=='NGA']['GDP'].values[0]
+        cdd_NGA = ac_data[ac_data['ISO3']=='NGA']['DD_mean'].values[0]
+        contour_function = exposure_function(gdp_NGA*((1+gdp_x)**(configurations['future_years'][-1]-configurations['ref_year'])), cdd_NGA*(1+cdd_x))*cdd_NGA*(1+cdd_x)
 
-    # Plot the data
-    for effect in data_dict:
-        # Plot only results without inv in the name
-        data = [data_dict[effect][res] for res in data_dict[effect] if 'inv' not in res]
-        ax.plot(plot_years, data, label='pop-weighted CDD')
-        data_inv = [data_dict[effect][res] for res in data_dict[effect] if 'inv' in res]
-        ax.plot(plot_years, data_inv, label='exposure weighted CDD to balance pop-weighted CDD')
+        plt.xlabel('Average GDP growth (annual %)')
+        plt.ylabel('Cooling degree days increase by 2100 (%)')
+        color_map = 'cool'
+        gdp_x = gdp_x*100
+        cdd_x = cdd_x*100
+        plt.title('Nigeria')
 
-    # Dashed horizontal line at reference year
-    ax.axhline(data_dict[list(data_dict.keys())[0]]["pop2000_temp2000_gdp2000"], color='grey', linestyle='--', label='Reference year 2000')
+    level_max = 5000.
+    levels = np.linspace(0, level_max, 21)
 
-    # Add a legend
-    ax.legend()
-    ax.set_xlabel('Year')
-    # x tick labels at plot_years
-    ax.set_xticks(plot_years)
-    ax.set_xlim([plot_years[0], plot_years[-1]])
-    ax.set_ylabel('Experienced cooling degree days per person')
-    ax.set_title('Exposure development to balance population-weighted cooling degree day changes', pad=20)
+    plt.contourf(gdp_x, cdd_x, contour_function, levels=levels, cmap=color_map)
+    plt.colorbar(label='Exposure to outside temperatures multiplied by CDD', ticks=np.linspace(0, level_max, 11))
 
-    # Save the figure
-    if not os.path.exists('Figures'):
-        os.makedirs('Figures')
-    plt.savefig('Figures/population_temperature_effect.png')
+    # Add contour lines
+    clines = plt.contour(gdp_x, cdd_x, contour_function, levels=levels, colors='k', linewidths=0.3)
+    label_prec = '%d'
+    plt.clabel(clines, levels[::2], fmt=label_prec, fontsize=8, colors='black')
+
+    plt.clim(0, level_max)
+ 
+    if add_data:
+        # Plot AC access as a function of GDP per capita and cooling degree days for some countries
+        countries_highest_pop = ['CHN', 'IND', 'USA', 'IDN', 'PAK', 'BRA', 'NGA']
+        ac_data_2100 = ac_data[ac_data['ISO3'].str.contains('2100')]
+        ac_data_sel = ac_data[ac_data['ISO3'].isin(countries_highest_pop)]
+        ac_data_2100_sel = ac_data_2100[ac_data_2100['ISO3'].isin([country + '_2100' for country in countries_highest_pop])]
+
+        # Use marker that is not filled and black edge
+        plt.scatter(ac_data_sel['GDP'], ac_data_sel['DD_mean'], c=exposure_function(ac_data_sel['GDP'], ac_data_sel['DD_mean'])*ac_data_sel['DD_mean'], 
+                    cmap='YlOrRd', vmin=0., vmax=level_max, s=12, edgecolors='purple')
+        
+        ac_data_scatter = pd.concat([ac_data_sel, ac_data_2100_sel]).reset_index(drop=True)
+
+        scenario_colors = ['green', 'blue', 'red']
+        # Draw lines between 2018 and 2100 for each country
+        for country in countries_highest_pop:
+
+            ac_data_sel_country = ac_data_scatter[ac_data_scatter['ISO3'] == country]
+            for isc,scenario in enumerate(configurations['future_scenarios']):
+                # Collect GDP and CDD values for line plot
+                gdps, cdds = [ac_data_sel_country['GDP'].values[0]], [ac_data_sel_country['DD_mean'].values[0]]
+
+                for year in configurations['future_years']:
+                    
+                    future_gdp = ac_data_sel_country['GDP_{0}_{1}'.format(scenario.split("_")[0].upper(), year)].values[0]
+                    future_cdd = ac_data_sel_country['CDD_{0}_{1}'.format(scenario, year)].values[0]
+
+                    plt.scatter(ac_data_sel_country['GDP_{0}_{1}'.format(scenario.split("_")[0].upper(), year)], ac_data_sel_country['CDD_{0}_{1}'.format(scenario, year)], 
+                    c=exposure_function(ac_data_sel_country['GDP_{0}_{1}'.format(scenario.split("_")[0].upper(), year)], ac_data_sel_country['GDP_{0}_{1}'.format(scenario.split("_")[0].upper(), year)])*ac_data_sel_country['CDD_{0}_{1}'.format(scenario, year)], 
+                    cmap='YlOrRd', vmin=0., vmax=level_max,  s=12, edgecolors=scenario_colors[isc], label=scenario)
+
+                    gdps.append(future_gdp)
+                    cdds.append(future_cdd)
+
+                plt.plot(gdps, cdds, c=scenario_colors[isc], linewidth=0.5)
+                # Label last point with future_years[-1]
+                plt.annotate(configurations['future_years'][-1], (gdps[-1], cdds[-1]+10), fontsize=6, color=scenario_colors[isc])
+        
+        # Label points with country names
+        for i, txt in enumerate(ac_data_scatter['ISO3'].values):
+            plt.annotate(txt, (ac_data_scatter['GDP'][i]*1.05, ac_data_scatter['DD_mean'][i]-100), fontsize=8.5, color="purple")
+
+        
+        # Only show unique labels once
+        handles, labels = plt.gca().get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
+        plt.legend(by_label.values(), by_label.keys(), fontsize=8, loc='upper left')
+        # plt.legend()
+
+    plt.savefig('Figures/exposure_funct_analysis/{0}.png'.format(name_tag), dpi=300)
+
+
+def plot_gdp_increase_map(configurations, gdp_cdd_data, geo_df, future_scenario):
+    """
+    Plot annual average GDP growth for historical and constant experienced CDD
+    """
+    fig, ax = plt.subplots(2, 1, figsize=(10, 5), sharex=True, sharey=True)
+    fig.subplots_adjust(hspace=0.15)
+    # No axes ticks
+    plt.xticks([])
+    plt.yticks([])
+    # Add title above first subplot
+    fig.suptitle('Average annual GDP growth', fontsize=14)
+    # Add labels a and b to subplots
+    ax[0].text(0.01, 1.02, 'a Historical', transform=ax[0].transAxes, size=10, weight='bold')
+    ax[1].text(0.01, 1.02, 'b To balance warming {0}'.format(future_scenario), transform=ax[1].transAxes, size=10, weight='bold')
+
+    geo_df['gdp_const_{0}'.format(future_scenario)] = gdp_cdd_data['gdp_const_{0}'.format(future_scenario)] * 100.
+    geo_df['gdp_historical_factor'] = gdp_cdd_data['gdp_historical_factor'] * 100.
+
+    geo_df.plot(column='gdp_historical_factor', ax=ax[0], cmap='inferno_r', vmin=0, vmax=8)
+    geo_df.plot(column='gdp_const_{0}'.format(future_scenario), ax=ax[1], cmap='inferno_r', vmin=0, vmax=8)
+    
+    # Add one shared colorbar which is half the height of the figure
+    fig.colorbar(ax[1].collections[0], ax=ax, shrink=0.75, label='GDP growth (annual %)')
+
+    plt.savefig('Figures/exposure_funct_analysis/gdp_const_{0}_map.png'.format(future_scenario), dpi=300)
+
+
+def plot_gdp_increase_scatter(gdp_cdd_data, future_scenario):
+    """
+    Plot difference in exposure times CDD as a function of GDP per capita
+    """
+    plt.figure()
+    ac_data_new_plot = gdp_cdd_data.reset_index()
+
+    # Add continent column were country is in
+    cc = coco.CountryConverter()
+    ac_data_new_plot['continent'] = ac_data_new_plot['ISO3'].apply(lambda x: cc.convert(names=x, to='continent'))
+    colors = ['red', 'green', 'blue', 'yellow', 'orange']
+
+    for ic, continent in enumerate(['Africa', 'Asia', 'Europe', 'America', 'Oceania']):
+        plt.scatter(ac_data_new_plot[ac_data_new_plot['continent'] == continent]['gdp_historical_factor']*100,
+                    ac_data_new_plot[ac_data_new_plot['continent'] == continent]['gdp_const_{0}'.format(future_scenario)]*100,
+                    label=continent, c=colors[ic], s=10, marker='o')
+    ###
+    # plt.scatter(ac_data_new_plot['gdp_historical_factor']*100,
+    #             ac_data_new_plot['gdp_const_{0}'.format(future_scenario)]*100,
+    #             c=ac_data_new_plot['diff_cdd'], cmap='viridis', s=10, marker='o')
+    
+    # # Add colorbar
+    # plt.colorbar(label='Difference in exposure times CDD')
+    ###
+    
+    plt.xlabel('Average historical GDP growth (annual %)')
+    plt.ylabel('Average GDP growth for constant experienced CDD\nunder {0} (annual %)'.format(future_scenario))
+
+    # Label each point with country name if it has a value that is not NaN
+    count = 0
+    for i, txt in enumerate(ac_data_new_plot['ISO3'].values):
+        if not np.isnan(ac_data_new_plot['gdp_const_{0}'.format(future_scenario)][i]) and not np.isnan(ac_data_new_plot['gdp_historical_factor'][i]):
+            plt.annotate(txt, (ac_data_new_plot['gdp_historical_factor'][i]*100, ac_data_new_plot['gdp_const_{0}'.format(future_scenario)][i]*100), fontsize=6)
+            count += 1
+    print('Number of countries with data: {0}'.format(count))
+
+    # Dashed diagonal line
+    min = np.min([np.min(ac_data_new_plot['gdp_historical_factor']*100), np.min(ac_data_new_plot['gdp_const_{0}'.format(future_scenario)]*100)])
+    max = np.max([np.max(ac_data_new_plot['gdp_historical_factor']*100), np.max(ac_data_new_plot['gdp_const_{0}'.format(future_scenario)]*100)])
+    plt.plot([min, max], [min, max], '--', c='grey', label='equal growth')
+
+    # Legend with two columns
+    plt.legend(ncol=2, fontsize=10)
+    plt.savefig('Figures/exposure_funct_analysis/gdp_const_vs_historical_{0}.png'.format(future_scenario), dpi=300)
