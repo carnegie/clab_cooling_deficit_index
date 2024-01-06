@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import matplotlib
 import geopandas as gpd
 import country_converter as coco
 import numpy as np
@@ -35,7 +36,7 @@ def plot_exposure_map(ac_data_historical):
     ax.set_xticks([])
     ax.set_yticks([])
 
-    plt.savefig('Figures/exposure_map.png', dpi=300)
+    plt.savefig('Figures/paper/exposure_map.png', dpi=300)
 
     return ac_data_map_geo
 
@@ -43,6 +44,7 @@ def plot_exposure_contour(configurations, exposure_function, ac_data, add_data=T
     """
     Conntour plot of penetration of air conditioning as a function of GDP per capita and cooling degree days
     """
+    matplotlib.rcParams['font.family'] = 'Helvetica'
     plt.figure()
     if not "NGA" in name_tag:
         cdd_x = np.linspace(100, 5000, 100)
@@ -78,6 +80,15 @@ def plot_exposure_contour(configurations, exposure_function, ac_data, add_data=T
 
     # Add contour lines
     clines = plt.contour(gdp_x, cdd_x, contour_function, levels=levels, colors='k', linewidths=0.3)
+    if "NGA" in name_tag:
+        # Add a contour line at value of constant exposure
+        const_exposure = exposure_function(gdp_NGA*(1**(configurations['future_years'][-1]-configurations['ref_year'])), cdd_NGA) * cdd_NGA
+        const_cline = plt.contour(gdp_x, cdd_x, contour_function, levels=[const_exposure], colors='k', linewidths=1)
+        # Add const cline to clines
+        clines.collections.extend(const_cline.collections)
+        # Add label to const cline
+        plt.clabel(const_cline, [const_exposure], fmt='constant exposure', fontsize=8, colors='black')
+    
     label_prec = '%d'
     plt.clabel(clines, levels[::2], fmt=label_prec, fontsize=8, colors='black')
 
@@ -132,7 +143,7 @@ def plot_exposure_contour(configurations, exposure_function, ac_data, add_data=T
         plt.legend(by_label.values(), by_label.keys(), fontsize=8, loc='upper left')
         # plt.legend()
 
-    plt.savefig('Figures/exposure_funct_analysis/{0}.png'.format(name_tag), dpi=300)
+    plt.savefig('Figures/paper/{0}.png'.format(name_tag), dpi=300)
 
 
 def plot_gdp_increase_map(configurations, gdp_cdd_data, geo_df, future_scenario):
@@ -159,7 +170,7 @@ def plot_gdp_increase_map(configurations, gdp_cdd_data, geo_df, future_scenario)
     # Add one shared colorbar which is half the height of the figure
     fig.colorbar(ax[1].collections[0], ax=ax, shrink=0.75, label='GDP growth (annual %)')
 
-    plt.savefig('Figures/exposure_funct_analysis/gdp_const_{0}_map.png'.format(future_scenario), dpi=300)
+    plt.savefig('Figures/paper/gdp_const_{0}_map.png'.format(future_scenario), dpi=300)
 
 
 def plot_gdp_increase_scatter(gdp_cdd_data, future_scenario):
@@ -205,4 +216,4 @@ def plot_gdp_increase_scatter(gdp_cdd_data, future_scenario):
 
     # Legend with two columns
     plt.legend(ncol=2, fontsize=10)
-    plt.savefig('Figures/exposure_funct_analysis/gdp_const_vs_historical_{0}.png'.format(future_scenario), dpi=300)
+    plt.savefig('Figures/paper/gdp_const_vs_historical_{0}.png'.format(future_scenario), dpi=300)
