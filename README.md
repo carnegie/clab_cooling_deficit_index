@@ -17,7 +17,7 @@ The data for the CDD predictions is from https://github.com/marina-andrijevic/co
 ## Setting up the environment
 The environment can be set up using conda. To create the environment, run
 
-```conda env create -f env.yml```.
+```conda env create -f env.yaml```.
 
 Then activate the environment by running
 

@@ -1,9 +1,5 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
-import country_converter as coco
-import seaborn as sns
 
 
 def read_ac_data(data_file):
@@ -11,8 +7,6 @@ def read_ac_data(data_file):
     Read AC data from file created with derive_exposure_functions.ipynb
     """
     ac_data = pd.read_csv(data_file)
-    # Remove rows with missing data
-    # ac_data = ac_data.dropna()
     # Reindex
     ac_data = ac_data.reset_index(drop=True)
     return ac_data
@@ -40,7 +34,7 @@ def read_gdp_data(year):
 
     return gdp_data
 
-def read_projections(configurations, data_type):
+def read_projections(configurations, data_type, isin_df):
     """
     Read in projections from file
     """
@@ -57,11 +51,11 @@ def read_projections(configurations, data_type):
             projection_df = projection_df_all[projection_df_all['year'] == year]
 
             if data_type == 'cdd':
-                projection_df = projection_df[(projection_df_all['ssp'] == ssp) & (projection_df['rcp'] == rcp) & (projection_df['stat'] == 'mean')]
+                projection_df = projection_df[(projection_df['ssp'] == ssp) & (projection_df['rcp'] == rcp) & (projection_df['stat'] == 'mean')]
                 projection_df = projection_df[['ISO', 'value']]
                 projection_df = projection_df.rename(columns={'ISO': 'ISO3', 'value': 'CDD_{0}_{1}'.format(scenario, year)})
             elif data_type == 'gdp':
-                projection_df = projection_df[projection_df_all['scenario'] == ssp]
+                projection_df = projection_df[projection_df['scenario'] == ssp]
                 projection_df = projection_df[['countrycode', 'gdppc']]
                 projection_df = projection_df.rename(columns={'countrycode': 'ISO3', 'gdppc': 'GDP_{0}_{1}'.format(ssp, year)})
 
@@ -69,6 +63,9 @@ def read_projections(configurations, data_type):
                 output_df = projection_df
             else:
                 output_df = pd.merge(output_df, projection_df, on='ISO3', how='outer')
+    
+    output_df = output_df[output_df['ISO3'].isin(isin_df['ISO3'])]
+
         
     return output_df
 
@@ -98,9 +95,9 @@ def calculate_average_gdp_growth(gdp_year_n, gdp_year_0, n_years):
     return (gdp_year_n / gdp_year_0) ** (1./n_years) - 1
 
 
-def add_historical_gdp_growth(gdp_cdd_data):
+def add_historical_gdp_growth(gdp_cdd_data, configurations):
     """
-    This function adds GDP growth to the df, historical and future
+    This function adds historical GDP growth to the df
     """
 
     # Add historic GDP growth
@@ -109,5 +106,5 @@ def add_historical_gdp_growth(gdp_cdd_data):
     # Merge with AC data
     gdp_cdd_data = pd.merge(gdp_cdd_data, gdp_data, left_on='ISO3', right_index=True)
     # Average annual GDP growth
-    gdp_cdd_data['gdp_historical_factor'] = calculate_average_gdp_growth(gdp_cdd_data['GDP'], gdp_cdd_data['GDP_1980'], 2018 - 1980)
+    gdp_cdd_data['gdp_historical_factor'] = calculate_average_gdp_growth(gdp_cdd_data['GDP'], gdp_cdd_data['GDP_1980'], configurations['ref_year'] - configurations['past_year'])
     return gdp_cdd_data

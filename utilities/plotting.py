@@ -1,3 +1,4 @@
+import os
 import matplotlib.pyplot as plt
 import matplotlib
 import geopandas as gpd
@@ -7,7 +8,10 @@ import pandas as pd
 from utilities.utilities import exposure_new, read_gdp_data, gdp_from_cdd_exposure
 
 def plot_exposure_map(ac_data_historical):
-    # Plot exposure map
+    """
+    Plot exposure map
+    """
+
     # Load world geometries
     world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
     # Copy your data
@@ -40,101 +44,160 @@ def plot_exposure_map(ac_data_historical):
 
     return ac_data_map_geo
 
-def plot_exposure_contour(configurations, exposure_function, ac_data, add_data=True, name_tag='exposure_contour'):
-    """
-    Conntour plot of penetration of air conditioning as a function of GDP per capita and cooling degree days
-    """
-    matplotlib.rcParams['font.family'] = 'Helvetica'
-    plt.figure()
-    if not "NGA" in name_tag:
-        cdd_x = np.linspace(100, 5000, 100)
-        gdp_x = np.linspace(0, 200000, 100)
-        cdd_x, gdp_x = np.meshgrid(cdd_x, gdp_x)
-        contour_function = exposure_function(gdp_x, cdd_x)*cdd_x
+
+class ContourPlot:
+    def __init__(self, configurations, ac_data, name_tag, country=None):
+        self.configurations = configurations
+        self.ac_data = ac_data
+        self.name_tag = name_tag
+        self.country = country
+
+        matplotlib.rcParams['font.family'] = 'Helvetica'
+
+    def contour_grid(self, cdd_range, gdp_range):
+        """
+        Create grid for contour plot
+        """
+        cdd_x = np.linspace(cdd_range[0], cdd_range[1], cdd_range[2])
+        gdp_x = np.linspace(gdp_range[0], gdp_range[1], gdp_range[2])
+        self.cdd_x, self.gdp_x = np.meshgrid(cdd_x, gdp_x)
+
+    def calculate_contour(self, exposure_function):
+        """
+        Calculate contour function
+        """
+        if self.country == None:
+            self.contour_function = exposure_function(self.gdp_x, self.cdd_x)*self.cdd_x
+        else:
+            self.gdp_country = self.ac_data[self.ac_data['ISO3']==self.country]['GDP'].values[0]
+            self.cdd_country = self.ac_data[self.ac_data['ISO3']==self.country]['DD_mean'].values[0]
+            self.contour_function = exposure_function(self.gdp_country*((1+self.gdp_x/100.)**(self.configurations['future_years'][-1]-self.configurations['ref_year'])), self.cdd_country*(1+self.cdd_x/100.))*self.cdd_country*(1+self.cdd_x/100.)
+    
+    def plot_contour(self):
+        """
+        Contour plot of exposure times CDD as a function of GDP per capita and cooling degree days
+        """
+        plt.figure()
+        self.level_max = 5000.
+        self.levels = np.linspace(0, self.level_max, 21)
+        color_map = 'YlOrRd'
+
+        plt.contourf(self.gdp_x, self.cdd_x, self.contour_function, levels=self.levels, cmap=color_map)
+        plt.colorbar(label='Exposure times CDD [°C days]', ticks=np.linspace(0, self.level_max, 11))
+
+    def set_x_log(self):
+        """
+        Set x-axis to log scale
+        """
         plt.xscale('log')
         
-        plt.xlabel('GDP per capita in 2018 USD')
-        plt.ylabel('Cooling degree days')
-        color_map = 'YlOrRd'
-    else:
-        cdd_x = np.linspace(0, 0.5, 100)
-        gdp_x = np.linspace(0, .05, 100)
-        cdd_x, gdp_x = np.meshgrid(cdd_x, gdp_x)
-        # Get GDP for NGA
-        gdp_NGA = ac_data[ac_data['ISO3']=='NGA']['GDP'].values[0]
-        cdd_NGA = ac_data[ac_data['ISO3']=='NGA']['DD_mean'].values[0]
-        contour_function = exposure_function(gdp_NGA*((1+gdp_x)**(configurations['future_years'][-1]-configurations['ref_year'])), cdd_NGA*(1+cdd_x))*cdd_NGA*(1+cdd_x)
+    def add_contour_lines(self):
+        """
+        Add contour lines
+        """
+        clines = plt.contour(self.gdp_x, self.cdd_x, self.contour_function, levels=self.levels, colors='k', linewidths=0.3)
+        plt.clabel(clines, self.levels[::2], fmt='%d', fontsize=8, colors='black')
+        plt.clim(0, self.levels[-1])
 
-        plt.xlabel('Average GDP growth (annual %)')
-        plt.ylabel('Cooling degree days increase by 2100 (%)')
-        color_map = 'cool'
-        gdp_x = gdp_x*100
-        cdd_x = cdd_x*100
-        plt.title('Nigeria')
+    def add_data(self, exposure_function):
+        """
+        Add data points
+        """           
+        # Collect data points
+        for country in self.configurations['countries_highest_pop']:
+            gdps, cdds, exposures_times_cdd = [], [], [] 
+            if self.country != None and country!=self.country: continue
 
-    level_max = 5000.
-    levels = np.linspace(0, level_max, 21)
+            ac_data_sel_country = self.ac_data[self.ac_data['ISO3'] == country]
 
-    plt.contourf(gdp_x, cdd_x, contour_function, levels=levels, cmap=color_map)
-    plt.colorbar(label='Exposure to outside temperatures multiplied by CDD', ticks=np.linspace(0, level_max, 11))
+            # Add historical data point "today"
+            if self.country == None:
+                gdps.append(ac_data_sel_country['GDP'].values[0])
+                cdds.append(ac_data_sel_country['DD_mean'].values[0])
+                exposures_times_cdd.append(ac_data_sel_country['exposure_times_cdd'].values[0])
 
-    # Add contour lines
-    clines = plt.contour(gdp_x, cdd_x, contour_function, levels=levels, colors='k', linewidths=0.3)
-    if "NGA" in name_tag:
-        # Add a contour line at value of constant exposure
-        const_exposure = exposure_function(gdp_NGA*(1**(configurations['future_years'][-1]-configurations['ref_year'])), cdd_NGA) * cdd_NGA
-        const_cline = plt.contour(gdp_x, cdd_x, contour_function, levels=[const_exposure], colors='k', linewidths=1)
-        # Add const cline to clines
-        clines.collections.extend(const_cline.collections)
-        # Add label to const cline
-        plt.clabel(const_cline, [const_exposure], fmt='constant exposure', fontsize=8, colors='black')
-    
-    label_prec = '%d'
-    plt.clabel(clines, levels[::2], fmt=label_prec, fontsize=8, colors='black')
+            else:
+                gdps.append((ac_data_sel_country['GDP']-self.gdp_country)/self.gdp_country)
+                cdds.append((ac_data_sel_country['DD_mean']-self.cdd_country)/self.cdd_country)
+                exposures_times_cdd.append(ac_data_sel_country['exposure_times_cdd'].values[0])
+            plt.annotate(self.configurations['ref_year'], (gdps[0], cdds[0]), fontsize=6, color=self.configurations['scenario_colors'][1], rotation=80)
 
-    plt.clim(0, level_max)
- 
-    if add_data:
-        # Plot AC access as a function of GDP per capita and cooling degree days for some countries
-        countries_highest_pop = ['CHN', 'IND', 'USA', 'IDN', 'PAK', 'BRA', 'NGA']
-        ac_data_2100 = ac_data[ac_data['ISO3'].str.contains('2100')]
-        ac_data_sel = ac_data[ac_data['ISO3'].isin(countries_highest_pop)]
-        ac_data_2100_sel = ac_data_2100[ac_data_2100['ISO3'].isin([country + '_2100' for country in countries_highest_pop])]
+            # Add future data points
+            for year in self.configurations['future_years']:
+                future_gdp = ac_data_sel_country['GDP_{0}_{1}'.format(self.configurations['base_future_scenario'].split("_")[0].upper(), year)]
+                future_cdd = ac_data_sel_country['CDD_{0}_{1}'.format(self.configurations['base_future_scenario'], year)]
+                if self.country == None:
+                    gdps.append(future_gdp.values[0])
+                    cdds.append(future_cdd.values[0])
+                else:
+                    gdps.append(((future_gdp/self.gdp_country)**(1./(self.configurations['future_years'][-1]-self.configurations['ref_year']))-1).values[0]*100.)
+                    cdds.append(((future_cdd-self.cdd_country)/self.cdd_country).values[0]*100.)    
+                
+                exposures_times_cdd.append(exposure_function(future_gdp, future_cdd)*future_cdd)
 
-        # Use marker that is not filled and black edge
-        plt.scatter(ac_data_sel['GDP'], ac_data_sel['DD_mean'], c=exposure_function(ac_data_sel['GDP'], ac_data_sel['DD_mean'])*ac_data_sel['DD_mean'], 
-                    cmap='YlOrRd', vmin=0., vmax=level_max, s=12, edgecolors='purple')
-        
-        ac_data_scatter = pd.concat([ac_data_sel, ac_data_2100_sel]).reset_index(drop=True)
+            plt.scatter(gdps, cdds, c=exposures_times_cdd,
+                    cmap='YlOrRd', vmin=0., vmax=self.level_max,  s=12, edgecolors=self.configurations['scenario_colors'][1],
+                      label=self.configurations['base_future_scenario'])  
+            
+            # Label last point with year, tilt by 45 degrees
+            plt.annotate(self.configurations['future_years'][-1], (gdps[-1], cdds[-1]), fontsize=6, 
+                         color=self.configurations['scenario_colors'][1], rotation=80) 
+            
+            # Connect points with line
+            plt.plot(gdps, cdds, c='blue', linewidth=0.5)          
 
-        scenario_colors = ['green', 'blue', 'red']
-        # Draw lines between 2018 and 2100 for each country
-        for country in countries_highest_pop:
 
-            ac_data_sel_country = ac_data_scatter[ac_data_scatter['ISO3'] == country]
-            for isc,scenario in enumerate(configurations['future_scenarios']):
-                # Collect GDP and CDD values for line plot
-                gdps, cdds = [ac_data_sel_country['GDP'].values[0]], [ac_data_sel_country['DD_mean'].values[0]]
 
-                for year in configurations['future_years']:
+def plot_exposure_contour(configurations, exposure_function, ac_data, x_y_ranges, country=None, name_tag='exposure_contour'):
+    """
+    Contour plot of penetration of air conditioning as a function of GDP per capita and cooling degree days
+    """
+    contour_plot = ContourPlot(configurations, ac_data, name_tag, country=country)
+    contour_plot.contour_grid(x_y_ranges[0], x_y_ranges[1])
+    contour_plot.calculate_contour(exposure_function)
+    contour_plot.plot_contour()
+    contour_plot.add_contour_lines()
+    contour_plot.add_data(exposure_function)
+
+    if not "country" in name_tag:
+        contour_plot.set_x_log()
+
+    """
+            for year in configurations['future_years']:
+                
+                future_gdp = ac_data_sel_country['GDP_{0}_{1}'.format(scenario.split("_")[0].upper(), year)]
+                future_cdd = ac_data_sel_country['CDD_{0}_{1}'.format(scenario, year)]
+                if "NGA" in name_tag:
+                    plt.scatter(((future_gdp/gdp_NGA)**(1./(configurations['future_years'][-1]-configurations['ref_year']))-1)*100, ((future_cdd-cdd_NGA)/cdd_NGA)*100, 
+                    c=exposure_function(future_gdp, future_cdd)*future_cdd, 
+                    cmap='YlOrRd', vmin=0., vmax=level_max,  s=12, edgecolors=scenario_colors[1], label=scenario)
                     
-                    future_gdp = ac_data_sel_country['GDP_{0}_{1}'.format(scenario.split("_")[0].upper(), year)].values[0]
-                    future_cdd = ac_data_sel_country['CDD_{0}_{1}'.format(scenario, year)].values[0]
-
+                    gdps.append(((future_gdp/gdp_NGA)**(1./(configurations['future_years'][-1]-configurations['ref_year']))-1).values[0]*100.)
+                    cdds.append(((future_cdd-cdd_NGA)/cdd_NGA).values[0]*100.)
+                else:    
                     plt.scatter(ac_data_sel_country['GDP_{0}_{1}'.format(scenario.split("_")[0].upper(), year)], ac_data_sel_country['CDD_{0}_{1}'.format(scenario, year)], 
-                    c=exposure_function(ac_data_sel_country['GDP_{0}_{1}'.format(scenario.split("_")[0].upper(), year)], ac_data_sel_country['GDP_{0}_{1}'.format(scenario.split("_")[0].upper(), year)])*ac_data_sel_country['CDD_{0}_{1}'.format(scenario, year)], 
-                    cmap='YlOrRd', vmin=0., vmax=level_max,  s=12, edgecolors=scenario_colors[isc], label=scenario)
+                    c=exposure_function(ac_data_sel_country['GDP_{0}_{1}'.format(scenario.split("_")[0].upper(), year)], ac_data_sel_country['CDD_{0}_{1}'.format(scenario, year)])*ac_data_sel_country['CDD_{0}_{1}'.format(scenario, year)], 
+                    cmap='YlOrRd', vmin=0., vmax=level_max,  s=12, edgecolors=scenario_colors[1], label=scenario)
 
-                    gdps.append(future_gdp)
-                    cdds.append(future_cdd)
+                    gdps.append(future_gdp.values[0])
+                    cdds.append(future_cdd.values[0])
+                
+            # Label points with year, tilt by 45 degrees
+            plt.annotate(configurations['future_years'][-1], (gdps[-1], cdds[-1]+y_space), fontsize=6, color=scenario_colors[1], rotation=80)
 
-                plt.plot(gdps, cdds, c=scenario_colors[isc], linewidth=0.5)
-                # Label last point with future_years[-1]
-                plt.annotate(configurations['future_years'][-1], (gdps[-1], cdds[-1]+10), fontsize=6, color=scenario_colors[isc])
+
+            plt.plot(gdps, cdds, c='blue', linewidth=0.5)
         
+            # Add horizontal dashed line for 2100 CDD increase
+            if "NGA" in name_tag:
+                for isc,scenario in enumerate(configurations['future_scenarios']):
+                    future_cdd_scenario = (((ac_data_sel_country['CDD_{0}_{1}'.format(scenario, configurations['future_years'][-1])]-cdd_NGA)/cdd_NGA)*100).values[0]
+                    plt.axhline(future_cdd_scenario, linestyle='--', c=scenario_colors[isc], linewidth=0.5)
+                    # Label line with RCP scenario in the format RCP 4.5
+                    plt.annotate(scenario.split("_")[1].upper().replace("P", "P ").replace("0", ".0").replace("5", ".5"), (4.5, future_cdd_scenario+0.5), fontsize=6, color=scenario_colors[isc])
         # Label points with country names
         for i, txt in enumerate(ac_data_scatter['ISO3'].values):
-            plt.annotate(txt, (ac_data_scatter['GDP'][i]*1.05, ac_data_scatter['DD_mean'][i]-100), fontsize=8.5, color="purple")
+            plt.annotate(txt, (ac_data_scatter['GDP'][i]*1.05, ac_data_scatter['DD_mean'][i]-100), fontsize=8.5, color="blue")
 
         
         # Only show unique labels once
@@ -143,8 +206,10 @@ def plot_exposure_contour(configurations, exposure_function, ac_data, add_data=T
         plt.legend(by_label.values(), by_label.keys(), fontsize=8, loc='upper left')
         # plt.legend()
 
+    if not os.path.exists('Figures/paper'):
+        os.makedirs('Figures/paper')
     plt.savefig('Figures/paper/{0}.png'.format(name_tag), dpi=300)
-
+    """
 
 def plot_gdp_increase_map(configurations, gdp_cdd_data, geo_df, future_scenario):
     """
@@ -155,11 +220,17 @@ def plot_gdp_increase_map(configurations, gdp_cdd_data, geo_df, future_scenario)
     # No axes ticks
     plt.xticks([])
     plt.yticks([])
-    # Add title above first subplot
-    fig.suptitle('Average annual GDP growth', fontsize=14)
+
+    # Add title
+    fig.suptitle('Economic development', fontsize=14)
+
     # Add labels a and b to subplots
     ax[0].text(0.01, 1.02, 'a Historical', transform=ax[0].transAxes, size=10, weight='bold')
-    ax[1].text(0.01, 1.02, 'b To balance warming {0}'.format(future_scenario), transform=ax[1].transAxes, size=10, weight='bold')
+    
+    parts = future_scenario.split('_')
+    result = parts[-1][:3].upper() + ' ' + parts[-1][3:4] + '.' + parts[-1][4:]
+
+    ax[1].text(0.01, 1.02, 'b To avoid increased heat exposure under {0}'.format(result), transform=ax[1].transAxes, size=10, weight='bold')
 
     geo_df['gdp_const_{0}'.format(future_scenario)] = gdp_cdd_data['gdp_const_{0}'.format(future_scenario)] * 100.
     geo_df['gdp_historical_factor'] = gdp_cdd_data['gdp_historical_factor'] * 100.
@@ -168,7 +239,7 @@ def plot_gdp_increase_map(configurations, gdp_cdd_data, geo_df, future_scenario)
     geo_df.plot(column='gdp_const_{0}'.format(future_scenario), ax=ax[1], cmap='inferno_r', vmin=0, vmax=8)
     
     # Add one shared colorbar which is half the height of the figure
-    fig.colorbar(ax[1].collections[0], ax=ax, shrink=0.75, label='GDP growth (annual %)')
+    fig.colorbar(ax[1].collections[0], ax=ax, shrink=0.75, label='Mean GDP growth (annual %)')
 
     plt.savefig('Figures/paper/gdp_const_{0}_map.png'.format(future_scenario), dpi=300)
 
@@ -189,17 +260,9 @@ def plot_gdp_increase_scatter(gdp_cdd_data, future_scenario):
         plt.scatter(ac_data_new_plot[ac_data_new_plot['continent'] == continent]['gdp_historical_factor']*100,
                     ac_data_new_plot[ac_data_new_plot['continent'] == continent]['gdp_const_{0}'.format(future_scenario)]*100,
                     label=continent, c=colors[ic], s=10, marker='o')
-    ###
-    # plt.scatter(ac_data_new_plot['gdp_historical_factor']*100,
-    #             ac_data_new_plot['gdp_const_{0}'.format(future_scenario)]*100,
-    #             c=ac_data_new_plot['diff_cdd'], cmap='viridis', s=10, marker='o')
     
-    # # Add colorbar
-    # plt.colorbar(label='Difference in exposure times CDD')
-    ###
-    
-    plt.xlabel('Average historical GDP growth (annual %)')
-    plt.ylabel('Average GDP growth for constant experienced CDD\nunder {0} (annual %)'.format(future_scenario))
+    plt.xlabel('Mean historical GDP growth (annual %)')
+    plt.ylabel('Economic development to avoid increased heat exposure\nunder {0} (annual %)'.format(future_scenario))
 
     # Label each point with country name if it has a value that is not NaN
     count = 0
@@ -212,7 +275,7 @@ def plot_gdp_increase_scatter(gdp_cdd_data, future_scenario):
     # Dashed diagonal line
     min = np.min([np.min(ac_data_new_plot['gdp_historical_factor']*100), np.min(ac_data_new_plot['gdp_const_{0}'.format(future_scenario)]*100)])
     max = np.max([np.max(ac_data_new_plot['gdp_historical_factor']*100), np.max(ac_data_new_plot['gdp_const_{0}'.format(future_scenario)]*100)])
-    plt.plot([min, max], [min, max], '--', c='grey', label='equal growth')
+    plt.plot([min, max], [min, max], '--', c='grey', label='1:1 line')
 
     # Legend with two columns
     plt.legend(ncol=2, fontsize=10)
