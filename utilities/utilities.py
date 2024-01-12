@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-
+import pickle
 
 def read_ac_data(data_file):
     """
@@ -10,6 +10,18 @@ def read_ac_data(data_file):
     # Reindex
     ac_data = ac_data.reset_index(drop=True)
     return ac_data
+
+def read_cdd_data(year):
+    dd_data = pd.read_csv('data_experiencedT/DD_ProcessedComplete.csv')
+
+    # For all countries get the Year 2018 and DD_type CDD18
+    dd_data = dd_data.loc[(dd_data['Year'] == year) & (dd_data['DD_type'] == 'CDD18')]
+    # Drop all columns except ISO3 and DD_mean
+    dd_data = dd_data[['ISO3', 'DD_mean']]
+    #Make ISO3 as index
+    dd_data = dd_data.set_index('ISO3')
+
+    return dd_data
 
 def read_gdp_data(year):
     """
@@ -69,24 +81,28 @@ def read_projections(configurations, data_type, isin_df):
         
     return output_df
 
+def saturation(cdd, a, b, c):
+    return (a - b*np.exp(-c*cdd))
 
-def exposure_new(gdp, cdd):
+def availability(gdp, a, b):
+    return (1/(1 + np.exp(a)* np.exp(b*gdp)))
+
+def exposure_function(gdp, a_avail, b_avail, cdd, a_sat, b_sat, c_sat):
     """
-    This function calculates the exposure of a country to climate change
+    This function calculates the exposure of a country to outside temperature
     """
-    avail_new = (1/(1 + np.exp(3.2)* np.exp(-0.00011*gdp)))
-    saturation_new = (0.93 - 0.93*np.exp(-0.005*cdd))
-    return (1 - avail_new*saturation_new)
+    avail = availability(gdp, a_avail, b_avail)
+    sat = saturation(cdd, a_sat, b_sat, c_sat)
+    return (1 - avail*sat) 
 
-
-def gdp_from_cdd_exposure(exposure_cdd, cdd):
+def gdp_from_cdd_exposure(exposure_cdd, cdd, loaded_parameters):
     """
     This function calculates the GDP per capita assuming fixed exposure * cooling degree days
     """
-    sat = (0.93 - 0.93*np.exp(-0.005*cdd))
+    sat = (loaded_parameters['sat_a'] - loaded_parameters['sat_b']*np.exp(-1*loaded_parameters['sat_c']*cdd))
     sat.index = exposure_cdd.index
     cdd.index = exposure_cdd.index
-    return (np.log((1./np.exp(3.2))*((sat/(1 - exposure_cdd/cdd)) - 1))/(-0.00011))
+    return (np.log((1./np.exp(loaded_parameters['av_a']))*((sat/(1 - exposure_cdd/cdd)) - 1))/(loaded_parameters['av_b']))
 
 def calculate_average_gdp_growth(gdp_year_n, gdp_year_0, n_years):
     """
@@ -101,7 +117,7 @@ def add_historical_gdp_growth(gdp_cdd_data, configurations):
     """
 
     # Add historic GDP growth
-    gdp_data = read_gdp_data('1980')
+    gdp_data = read_gdp_data(str(configurations['past_year']))
     gdp_data = gdp_data.rename(columns={'GDP': 'GDP_1980'})
     # Merge with AC data
     gdp_cdd_data = pd.merge(gdp_cdd_data, gdp_data, left_on='ISO3', right_index=True)

@@ -35,3 +35,10 @@ countries_highest_pop:
   - 'PAK'
   - 'BRA'
   - 'NGA'
+
+continent_colors:
+  Africa: 'red'
+  Asia: 'green'
+  Europe: 'blue'
+  America: 'orange'
+  Oceania: 'purple'
