@@ -168,35 +168,36 @@ class ContourPlot(ExperiencedTPlot):
 
             ac_data_sel_country = self.ac_data[self.ac_data['ISO3'] == country]
 
-            # Add data points
-            for iy,year in enumerate([self.configurations['ref_year']]+self.configurations['future_years']):
-                if year != self.configurations['ref_year']:
-                    gdp = ac_data_sel_country['GDP_{0}_{1}'.format(self.configurations['base_future_scenario'].split("_")[0].upper(), year)].values[0]
-                    cdd = ac_data_sel_country['CDD_{0}_{1}'.format(self.configurations['base_future_scenario'], year)].values[0]
-                else:
-                    gdp = ac_data_sel_country['GDP'].values[0]
-                    cdd = ac_data_sel_country['DD_mean'].values[0]
-                
-                if self.country == None:
-                    gdps.append(gdp)
-                    cdds.append(cdd)
-                else:
-                    gdps.append(((gdp/self.gdp_country)**(1./(self.configurations['future_years'][-1]-self.configurations['ref_year']))-1)*100.)
-                    cdds.append(((cdd-self.cdd_country)/self.cdd_country)*100.)
+            for isc,scenario in enumerate(self.configurations['future_scenarios']):
+                # Add data points
+                for iy,year in enumerate([self.configurations['ref_year']]+self.configurations['future_years']):
+                    if year != self.configurations['ref_year']:
+                        gdp = ac_data_sel_country['GDP_{0}_{1}'.format(scenario.split("_")[0].upper(), year)].values[0]
+                        cdd = ac_data_sel_country['CDD_{0}_{1}'.format(scenario, year)].values[0]
+                    else:
+                        gdp = ac_data_sel_country['GDP'].values[0]
+                        cdd = ac_data_sel_country['DD_mean'].values[0]
                     
-                exposures_times_cdd.append((exposure_function(gdp, cdd)*cdd))
+                    if self.country == None:
+                        gdps.append(gdp)
+                        cdds.append(cdd)
+                    else:
+                        gdps.append(((gdp/self.gdp_country)**(1./(self.configurations['future_years'][-1]-self.configurations['ref_year']))-1)*100.)
+                        cdds.append(((cdd-self.cdd_country)/self.cdd_country)*100.)
+                        
+                    exposures_times_cdd.append((exposure_function(gdp, cdd)*cdd))
 
-                # Label points with year for one country
-                if country == self.configurations['countries_highest_pop'][0]:
-                    plt.annotate(year, (gdps[iy], cdds[iy]+75), fontsize=8,
-                            color=self.configurations['scenario_colors'][1], rotation=60)
+                    # Label points with year for one country
+                    if country == self.configurations['countries_highest_pop'][0]:
+                        plt.annotate(year, (gdps[iy], cdds[iy]+75), fontsize=8,
+                                color='purple', rotation=60)
 
-            plt.scatter(gdps, cdds, c=exposures_times_cdd,
-                    cmap='YlOrRd', vmin=0., vmax=self.level_max,  s=12, edgecolors=self.configurations['scenario_colors'][1],
-                      label=self.configurations['base_future_scenario'])  
-            
-            # Connect points with line
-            plt.plot(gdps, cdds, c='blue', linewidth=0.75)
+                plt.scatter(gdps, cdds, c=exposures_times_cdd,
+                        cmap='YlOrRd', vmin=0., vmax=self.level_max,  s=12, edgecolors=self.configurations['scenario_colors'][isc],
+                        label=scenario)  
+                print("scenario color", self.configurations['scenario_colors'][isc])
+                # Connect points with line
+                plt.plot(gdps, cdds, c=self.configurations['scenario_colors'][isc], linewidth=0.75)
 
     def add_control_data(self, color):
         """

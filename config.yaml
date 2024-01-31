@@ -8,9 +8,9 @@ gdp_projections_file: 'data_experiencedT/projections/gdp_edu_projections.csv'
 
 # Years
 future_years: 
-  - 2040
-  - 2060
-  - 2080
+  # - 2040
+  # - 2060
+  # - 2080
   - 2100
 
 ref_year: 2018

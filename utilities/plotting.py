@@ -23,7 +23,7 @@ def plot_exposure_contour(configurations, exposure_function, ac_data, x_y_ranges
     contour_plot.add_contour_lines(exposure_function)
     if not control:
         data_countries = configurations['countries_highest_pop']
-        data_color = configurations['scenario_colors'][1]
+        data_color = 'purple'
     else:
         data_color = 'grey'
         contour_plot.add_control_data(data_color)
