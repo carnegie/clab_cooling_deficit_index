@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-import pickle
+import logging
 
 def read_ac_data(data_file):
     """
@@ -38,7 +38,7 @@ def read_gdp_data(year):
     # Rename Country Code to ISO3
     gdp_data = gdp_data.rename(columns={'Country Code': 'ISO3'})
     # Make ISO3 as index
-    gdp_data = gdp_data.set_index('ISO3')
+    # gdp_data = gdp_data.set_index('ISO3')
     # Rename year to GDP
     gdp_data = gdp_data.rename(columns={year: 'GDP'})
     # Convert from 2017$ to 2018$
@@ -110,17 +110,62 @@ def calculate_average_gdp_growth(gdp_year_n, gdp_year_0, n_years):
     """
     return (gdp_year_n / gdp_year_0) ** (1./n_years) - 1
 
+def fill_missing_country_gdp_data(start_year, data_frame, configs):
+    """
+    This function fills in missing data for a country, by finding the closest year with data
+    for the historical reference year, we find the next latest year with data
+    for the present day year, we find the next earliest year with data
+    """
+    # Loop through countries and find empty GDP data
+    start_year = int(start_year)
+    if start_year == configs['past_year']:
+        add_value = 1
+    elif start_year == configs['ref_year']:
+        add_value = -1
+    for country_name in data_frame['ISO3']:
+        data_year = start_year
+        if data_frame[data_frame['ISO3'] == country_name]['GDP'].isnull().values.any():
+            logging.info("No data for {0} in {1}".format(country_name, start_year))
+            gdp_data_historical_country = None
+            while gdp_data_historical_country == None:
+                data_year += add_value
+                # GDP data available from 1960 to 2022
+                if data_year > 2022 or data_year < 1960:
+                    logging.info("No data for {0} in any year".format(country_name))
+                    break
+                gdp_data_historical = read_gdp_data(str(data_year))
+                if not gdp_data_historical[gdp_data_historical['ISO3'] == country_name]['GDP'].isnull().values.any():
+                    gdp_data_historical_country = gdp_data_historical[gdp_data_historical['ISO3'] == country_name]['GDP'].values[0]
+                    logging.info("Found data for {0} in {1}".format(country_name, data_year))
+            # Add GDP data to gdp_data
+            data_frame.loc[data_frame['ISO3'] == country_name, 'GDP'] = gdp_data_historical_country 
+
+    return data_frame
 
 def add_historical_gdp_growth(gdp_cdd_data, configurations):
     """
     This function adds historical GDP growth to the df
     """
+    # Set loggin level from configurations
+    logging.basicConfig(level=configurations['logging_level'])
 
     # Add historic GDP growth
     gdp_data = read_gdp_data(str(configurations['past_year']))
-    gdp_data = gdp_data.rename(columns={'GDP': 'GDP_1980'})
+    #Show all rows
+    pd.set_option('display.max_rows', None)
+
+    # Get GDP from next year until there is data   
+    gdp_data = fill_missing_country_gdp_data(configurations['past_year'], gdp_data, configurations)  
+
+    # Print countries that still have no data
+    logging.info("Countries with still no GDP data:")
+    logging.info(gdp_data[gdp_data['GDP'].isnull()]['ISO3'].unique())
+
+    # Rename GDP column
+    gdp_data = gdp_data.rename(columns={'GDP': 'GDP_historical_ref_year'})
     # Merge with AC data
-    gdp_cdd_data = pd.merge(gdp_cdd_data, gdp_data, left_on='ISO3', right_index=True)
+    gdp_cdd_data = pd.merge(gdp_cdd_data, gdp_data, on='ISO3', how='outer')
+
     # Average annual GDP growth
-    gdp_cdd_data['gdp_historical_factor'] = calculate_average_gdp_growth(gdp_cdd_data['GDP'], gdp_cdd_data['GDP_1980'], configurations['ref_year'] - configurations['past_year'])
+    gdp_cdd_data['gdp_historical_factor'] = calculate_average_gdp_growth(gdp_cdd_data['GDP'], gdp_cdd_data['GDP_historical_ref_year'], configurations['ref_year'] - configurations['past_year'])
     return gdp_cdd_data

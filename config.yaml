@@ -1,5 +1,7 @@
 # Configuration settings
 
+logging_level: 'INFO'
+
 # Files
 cdd_projections_file: 'data_experiencedT/projections/ISO_CDD_GDP18_agg_data.csv'
 gdp_projections_file: 'data_experiencedT/projections/gdp_edu_projections.csv'
