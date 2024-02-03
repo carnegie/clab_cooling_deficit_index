@@ -11,8 +11,8 @@ def read_ac_data(data_file):
     ac_data = ac_data.reset_index(drop=True)
     return ac_data
 
-def read_cdd_data(year):
-    dd_data = pd.read_csv('data_experiencedT/DD_ProcessedComplete.csv')
+def read_cdd_data(year, cdd_data_path):
+    dd_data = pd.read_csv(cdd_data_path)
 
     # For all countries get the Year 2018 and DD_type CDD18
     dd_data = dd_data.loc[(dd_data['Year'] == year) & (dd_data['DD_type'] == 'CDD18')]
@@ -23,22 +23,17 @@ def read_cdd_data(year):
 
     return dd_data
 
-def read_gdp_data(year):
+def read_gdp_data(year, gdp_data_path):
     """
     Read in GDP data from file
     """
     # Open GDP PP file
-    # from https://data.worldbank.org/indicator/NY.GDP.PCAP.PP.KD
-    # Purchasing power parity
-    # gdp_data = pd.read_csv('data_experiencedT/API_NY.GDP.PCAP.PP.KD_DS2_en_csv_v2_5873868.csv', skiprows=4)
     # GDP in current $
-    gdp_data = pd.read_csv('data_experiencedT/API_NY.GDP.PCAP.CD_DS2_en_csv_v2_5871588.csv')
+    gdp_data = pd.read_csv(gdp_data_path, skiprows=4)
     # Drop all columns except Country Code and year
     gdp_data = gdp_data[['Country Code', year]]
     # Rename Country Code to ISO3
     gdp_data = gdp_data.rename(columns={'Country Code': 'ISO3'})
-    # Make ISO3 as index
-    # gdp_data = gdp_data.set_index('ISO3')
     # Rename year to GDP
     gdp_data = gdp_data.rename(columns={year: 'GDP'})
     # Convert from 2017$ to 2018$
@@ -78,7 +73,6 @@ def read_projections(configurations, data_type, isin_df):
     
     output_df = output_df[output_df['ISO3'].isin(isin_df['ISO3'])]
 
-        
     return output_df
 
 def saturation(cdd, a, b, c):
@@ -99,9 +93,8 @@ def gdp_from_cdd_exposure(exposure_cdd, cdd, loaded_parameters):
     """
     This function calculates the GDP per capita assuming fixed exposure * cooling degree days
     """
-    sat = (loaded_parameters['sat_a'] - loaded_parameters['sat_b']*np.exp(-1*loaded_parameters['sat_c']*cdd))
-    sat.index = exposure_cdd.index
-    cdd.index = exposure_cdd.index
+    sat = saturation(cdd, loaded_parameters['sat_a'], loaded_parameters['sat_b'], loaded_parameters['sat_c'])
+    exp_overcdd = exposure_cdd[exposure_cdd.index == 62]/cdd[cdd.index == 62]
     return (np.log((1./np.exp(loaded_parameters['av_a']))*((sat/(1 - exposure_cdd/cdd)) - 1))/(loaded_parameters['av_b']))
 
 def calculate_average_gdp_growth(gdp_year_n, gdp_year_0, n_years):
@@ -133,7 +126,7 @@ def fill_missing_country_gdp_data(start_year, data_frame, configs):
                 if data_year > 2022 or data_year < 1960:
                     logging.info("No data for {0} in any year".format(country_name))
                     break
-                gdp_data_historical = read_gdp_data(str(data_year))
+                gdp_data_historical = read_gdp_data(str(data_year), configs['gdp_historical_file'])
                 if not gdp_data_historical[gdp_data_historical['ISO3'] == country_name]['GDP'].isnull().values.any():
                     gdp_data_historical_country = gdp_data_historical[gdp_data_historical['ISO3'] == country_name]['GDP'].values[0]
                     logging.info("Found data for {0} in {1}".format(country_name, data_year))
@@ -150,7 +143,7 @@ def add_historical_gdp_growth(gdp_cdd_data, configurations):
     logging.basicConfig(level=configurations['logging_level'])
 
     # Add historic GDP growth
-    gdp_data = read_gdp_data(str(configurations['past_year']))
+    gdp_data = read_gdp_data(str(configurations['past_year']), configurations['gdp_historical_file'])
     #Show all rows
     pd.set_option('display.max_rows', None)
 

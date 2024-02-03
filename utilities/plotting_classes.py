@@ -6,7 +6,7 @@ import country_converter as coco
 import numpy as np
 import re
 from utilities.utilities import read_gdp_data, gdp_from_cdd_exposure
-import pandas as pd
+import matplotlib.lines as mlines
 
 class ExperiencedTPlot:
     def __init__(self, configurations, ac_data, name_tag, country=None):
@@ -41,7 +41,7 @@ class ExperiencedTPlot:
         # Only show unique labels once
         handles, labels = plt.gca().get_legend_handles_labels()
         by_label = dict(zip(labels, handles))
-        plt.legend(by_label.values(), by_label.keys(), fontsize=10, loc='upper left', ncol=columns)
+        plt.legend(by_label.values(), by_label.keys(), fontsize=8, loc='upper left', ncol=columns)
     
     def save_figure(self):
         """
@@ -49,7 +49,7 @@ class ExperiencedTPlot:
         """
         if not os.path.exists('Figures/paper'):
             os.makedirs('Figures/paper')
-        plt.savefig('Figures/paper/{0}.png'.format(self.name_tag), dpi=400)
+        plt.savefig('Figures/paper/{0}.pdf'.format(self.name_tag), dpi=400, bbox_inches='tight')
 
     def set_x_log(self):
         """
@@ -137,7 +137,7 @@ class ContourPlot(ExperiencedTPlot):
         """
         self.level_max = 5000.
         self.levels = np.linspace(0, self.level_max, 21)
-        color_map = 'YlOrRd'
+        color_map = 'inferno_r'
 
         plt.contourf(self.gdp_x, self.cdd_x, self.contour_function, levels=self.levels, cmap=color_map)
         plt.colorbar(label='Exposure times CDD [°C days]', ticks=np.linspace(0, self.level_max, 11))
@@ -163,12 +163,13 @@ class ContourPlot(ExperiencedTPlot):
         """           
         # Collect data points
         for country in self.configurations['countries_highest_pop']:
-            gdps, cdds, exposures_times_cdd = [], [], [] 
+            
             if self.country != None and country!=self.country: continue
 
             ac_data_sel_country = self.ac_data[self.ac_data['ISO3'] == country]
 
             for isc,scenario in enumerate(self.configurations['future_scenarios']):
+                gdps, cdds, exposures_times_cdd = [], [], [] 
                 # Add data points
                 for iy,year in enumerate([self.configurations['ref_year']]+self.configurations['future_years']):
                     if year != self.configurations['ref_year']:
@@ -187,17 +188,20 @@ class ContourPlot(ExperiencedTPlot):
                         
                     exposures_times_cdd.append((exposure_function(gdp, cdd)*cdd))
 
-                    # Label points with year for one country
-                    if country == self.configurations['countries_highest_pop'][0]:
-                        plt.annotate(year, (gdps[iy], cdds[iy]+75), fontsize=8,
-                                color='purple', rotation=60)
-
-                plt.scatter(gdps, cdds, c=exposures_times_cdd,
+                formatted_scenario = scenario.split("_")[0].upper() + ' ' + scenario.split("_")[1].upper()
+                formatted_scenario = formatted_scenario.replace(formatted_scenario[-1], '.'+formatted_scenario[-1])
+                plt.scatter(gdps[1:], cdds[1:], c=exposures_times_cdd[1:],
                         cmap='YlOrRd', vmin=0., vmax=self.level_max,  s=12, edgecolors=self.configurations['scenario_colors'][isc],
-                        label=scenario)  
-                print("scenario color", self.configurations['scenario_colors'][isc])
+                        label=formatted_scenario+' 2100', marker='o')
+
                 # Connect points with line
-                plt.plot(gdps, cdds, c=self.configurations['scenario_colors'][isc], linewidth=0.75)
+                plt.plot(gdps, cdds, c=self.configurations['scenario_colors'][isc], linewidth=0.75,
+                         linestyle='--', dashes=(5, 5), alpha=0.8)
+        
+            # Plot point for reference year
+            plt.scatter(gdps[0], cdds[0], c=exposures_times_cdd[0], cmap='YlOrRd', vmin=0., 
+                    vmax=self.level_max,  s=12, edgecolors='#7f00ff', label=str(self.configurations['ref_year']), marker='o')
+
 
     def add_control_data(self, color):
         """
@@ -237,7 +241,10 @@ class ContourPlot(ExperiencedTPlot):
         """
         for txt in countries:
             country_index = self.ac_data[self.ac_data['ISO3'] == txt].index[0]
-            plt.annotate(txt, (self.ac_data['GDP'][country_index]*1.05, self.ac_data['DD_mean'][country_index]-100), fontsize=8.5, color=color)
+            # Replace ISO3 code with country name
+            full_name = coco.convert(names=txt, to='name_short')
+            plt.annotate(full_name, (self.ac_data['GDP'][country_index]*1.05, self.ac_data['DD_mean'][country_index]-150), 
+                         fontsize=9, color=color, weight='bold')
 
 
 class GDPIncreaseMap(ExposurePlot):
@@ -272,7 +279,8 @@ class GDPIncreaseMap(ExposurePlot):
 
         self.ac_data_map_geo.plot(column='gdp_historical_factor', ax=self.ax[0], cmap='inferno_r', vmin=0, vmax=8)
         self.ac_data_map_geo.plot(column='gdp_const_{0}'.format(self.scenario), ax=self.ax[1], cmap='inferno_r', vmin=0, vmax=8)
-        
+        # Plot countries with no data in grey
+        self.ac_data_map_geo[self.ac_data_map_geo['gdp_const_{0}'.format(self.scenario)].isnull()].plot(ax=self.ax[1], color='lightgrey', label='')
         # Add one shared colorbar which is half the height of the figure
         self.fig.colorbar(self.ax[1].collections[0], ax=self.ax, shrink=0.75, label='Mean GDP growth (annual %)')
 
@@ -311,15 +319,15 @@ class GDPIncreaseScatter(GDPIncreaseMap):
         """
         Label countries with ISO3 code
         """
-        for i, txt in enumerate(self.ac_data['ISO3'].values):
-            if not np.isnan(self.ac_data['gdp_const_{0}'.format(self.scenario)][i]) and not np.isnan(self.ac_data['gdp_historical_factor'][i]):
-                if cscale != 'vs_gdp':
-                    plt.annotate(txt, (self.ac_data['gdp_historical_factor'][i]*100+0.1, self.ac_data['gdp_const_{0}'.format(self.scenario)][i]*100), fontsize=6)
-                else:
-                    # Only print every 5th country
-                    if i % 5 == 0:
-                        plt.annotate(txt, (self.ac_data['GDP'][i]+100, self.ac_data['gdp_const_{0}'.format(self.scenario)][i]*100+0.1),
-                                     fontsize=6, rotation=40)
+        for txt in self.configurations['countries_highest_pop']:
+            i = self.ac_data[self.ac_data['ISO3'] == txt].index[0]
+            txt = coco.convert(names=txt, to='name_short')
+            if cscale != 'vs_gdp':
+                plt.annotate(txt, (self.ac_data['gdp_historical_factor'][i]*100+0.1, self.ac_data['gdp_const_{0}'.format(self.scenario)][i]*100), 
+                             fontsize=8)
+            else:
+                plt.annotate(txt, (self.ac_data['GDP'][i]+100, self.ac_data['gdp_const_{0}'.format(self.scenario)][i]*100+0.1),
+                                     fontsize=8, rotation=40)
 
     def add_1_to_1_line(self):
         """

@@ -1,8 +1,16 @@
 # Configuration settings
 
-logging_level: 'INFO'
+logging_level: 'ERROR'
 
 # Files
+
+# Source: https://www.sciencedirect.com/science/article/pii/S0378778822004868
+cdd_historical_file: 'data_experiencedT/DD_ProcessedComplete.csv'
+# Source: https://data.worldbank.org/indicator/NY.GDP.PCAP.CD
+# gdp_historical_file: 'data_experiencedT/API_NY.GDP.PCAP.CD_DS2_en_csv_v2_5871588.csv'
+# Source: https://data.worldbank.org/indicator/NY.GDP.PCAP.PP.KD
+# Purchasing power parity
+gdp_historical_file: 'data_experiencedT/API_NY.GDP.PCAP.PP.KD_DS2_en_csv_v2_5873868.csv'
 cdd_projections_file: 'data_experiencedT/projections/ISO_CDD_GDP18_agg_data.csv'
 gdp_projections_file: 'data_experiencedT/projections/gdp_edu_projections.csv'
 

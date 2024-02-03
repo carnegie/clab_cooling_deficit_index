@@ -23,7 +23,10 @@ def plot_exposure_contour(configurations, exposure_function, ac_data, x_y_ranges
     contour_plot.add_contour_lines(exposure_function)
     if not control:
         data_countries = configurations['countries_highest_pop']
-        data_color = 'purple'
+        data_color = '#7f00ff'
+        if not country:
+            contour_plot.add_data(exposure_function)
+
     else:
         data_color = 'grey'
         contour_plot.add_control_data(data_color)
@@ -31,7 +34,6 @@ def plot_exposure_contour(configurations, exposure_function, ac_data, x_y_ranges
         data_countries = ac_data[ac_data['AC'].notnull()]['ISO3'].unique()
 
     if not country:
-        contour_plot.add_data(exposure_function)
         contour_plot.set_x_log()
         contour_plot.add_country_labels(data_countries, data_color)
         contour_plot.add_x_y_labels('GDP per capita (2018 USD)', 'Cooling degree days (°C days)')
@@ -64,7 +66,7 @@ def plot_gdp_increase_scatter(configurations, gdp_cdd_data, future_scenario, col
     """
     Plot difference in exposure times CDD as a function of GDP per capita
     """
-    gdp_increase_scatter = GDPIncreaseScatter(configurations, gdp_cdd_data, 'gdp_increase_scatter_{0}'.format(future_scenario), future_scenario)
+    gdp_increase_scatter = GDPIncreaseScatter(configurations, gdp_cdd_data, 'gdp_increase_scatter_{0}_{1}'.format(future_scenario, color_scale), future_scenario)
     gdp_increase_scatter.add_continent_info()
     gdp_increase_scatter.plot_scatter(color_scale)
     if color_scale != 'vs_gdp':
