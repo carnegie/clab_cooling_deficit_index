@@ -29,7 +29,7 @@ def read_gdp_data(year, gdp_data_path):
     """
     # Open GDP PP file
     # GDP in current $
-    gdp_data = pd.read_csv(gdp_data_path, skiprows=4)
+    gdp_data = pd.read_csv(gdp_data_path)#, skiprows=4)
     # Drop all columns except Country Code and year
     gdp_data = gdp_data[['Country Code', year]]
     # Rename Country Code to ISO3
@@ -94,7 +94,7 @@ def gdp_from_cdd_exposure(exposure_cdd, cdd, loaded_parameters):
     This function calculates the GDP per capita assuming fixed exposure * cooling degree days
     """
     sat = saturation(cdd, loaded_parameters['sat_a'], loaded_parameters['sat_b'], loaded_parameters['sat_c'])
-    exp_overcdd = exposure_cdd[exposure_cdd.index == 62]/cdd[cdd.index == 62]
+
     return (np.log((1./np.exp(loaded_parameters['av_a']))*((sat/(1 - exposure_cdd/cdd)) - 1))/(loaded_parameters['av_b']))
 
 def calculate_average_gdp_growth(gdp_year_n, gdp_year_0, n_years):

@@ -49,7 +49,9 @@ class ExperiencedTPlot:
         """
         if not os.path.exists('Figures/paper'):
             os.makedirs('Figures/paper')
-        plt.savefig('Figures/paper/{0}.pdf'.format(self.name_tag), dpi=400, bbox_inches='tight')
+        plt.savefig('Figures/paper/{0}.eps'.format(self.name_tag), dpi=400, bbox_inches='tight')
+        plt.savefig('Figures/paper/{0}.png'.format(self.name_tag), dpi=400, bbox_inches='tight')
+
 
     def set_x_log(self):
         """
@@ -191,7 +193,7 @@ class ContourPlot(ExperiencedTPlot):
                 formatted_scenario = scenario.split("_")[0].upper() + ' ' + scenario.split("_")[1].upper()
                 formatted_scenario = formatted_scenario.replace(formatted_scenario[-1], '.'+formatted_scenario[-1])
                 plt.scatter(gdps[1:], cdds[1:], c=exposures_times_cdd[1:],
-                        cmap='YlOrRd', vmin=0., vmax=self.level_max,  s=12, edgecolors=self.configurations['scenario_colors'][isc],
+                        cmap='inferno_r', vmin=0., vmax=self.level_max,  s=12, edgecolors=self.configurations['scenario_colors'][isc],
                         label=formatted_scenario+' 2100', marker='o')
 
                 # Connect points with line
@@ -199,8 +201,8 @@ class ContourPlot(ExperiencedTPlot):
                          linestyle='--', dashes=(5, 5), alpha=0.8)
         
             # Plot point for reference year
-            plt.scatter(gdps[0], cdds[0], c=exposures_times_cdd[0], cmap='YlOrRd', vmin=0., 
-                    vmax=self.level_max,  s=12, edgecolors='#7f00ff', label=str(self.configurations['ref_year']), marker='o')
+            plt.scatter(gdps[0], cdds[0], c=exposures_times_cdd[0], cmap='inferno_r', vmin=0., 
+                    vmax=self.level_max,  s=12, edgecolors='black', label=str(self.configurations['ref_year']), marker='o')
 
 
     def add_control_data(self, color):
@@ -208,7 +210,7 @@ class ContourPlot(ExperiencedTPlot):
         Add AC data for control plots
         """
         # Print AC data when not null
-        plt.scatter(self.ac_data['GDP'], self.ac_data['DD_mean'], c=(1.-self.ac_data['AC'])*self.ac_data['DD_mean'], cmap='YlOrRd', 
+        plt.scatter(self.ac_data['GDP'], self.ac_data['DD_mean'], c=(1.-self.ac_data['AC'])*self.ac_data['DD_mean'], cmap='inferno_r', 
                     vmin=0., vmax=self.level_max,  s=12, edgecolors=color, label='AC data')
 
     def add_cdd_predictions(self):
@@ -244,7 +246,7 @@ class ContourPlot(ExperiencedTPlot):
             # Replace ISO3 code with country name
             full_name = coco.convert(names=txt, to='name_short')
             plt.annotate(full_name, (self.ac_data['GDP'][country_index]*1.05, self.ac_data['DD_mean'][country_index]-150), 
-                         fontsize=9, color=color, weight='bold')
+                         fontsize=9, color=color)
 
 
 class GDPIncreaseMap(ExposurePlot):
