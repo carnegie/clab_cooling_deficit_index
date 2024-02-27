@@ -4,15 +4,14 @@ logging_level: 'ERROR'
 
 # Files
 
-# Source: https://www.sciencedirect.com/science/article/pii/S0378778822004868
-cdd_historical_file: 'data_experiencedT/DD_ProcessedComplete.csv'
-# Source: https://data.worldbank.org/indicator/NY.GDP.PCAP.CD
-gdp_historical_file: 'data_experiencedT/API_NY.GDP.PCAP.CD_DS2_en_csv_v2_5871588.csv'
-# Source: https://data.worldbank.org/indicator/NY.GDP.PCAP.PP.KD
-# Purchasing power parity
-# gdp_historical_file: 'data_experiencedT/API_NY.GDP.PCAP.PP.KD_DS2_en_csv_v2_5873868.csv'
+cdd_historical_file: 'data_experiencedT/historical/DD_ProcessedComplete.csv'
+gdp_historical_file: 'data_experiencedT/historical/API_NY.GDP.PCAP.PP.KD_DS2_en_csv_v2_5873868.csv'
 cdd_projections_file: 'data_experiencedT/projections/ISO_CDD_GDP18_agg_data.csv'
 gdp_projections_file: 'data_experiencedT/projections/gdp_edu_projections.csv'
+
+ac_historical_file_iea: 'data_experiencedT/exposure_function_derivation/percentage-of-households-equiped-with-ac-in-selected-countries-2018.csv'
+ac_historical_file_gdl: 'data_experiencedT/exposure_function_derivation/aircon_gdl.xlsx'
+ac_historical_file_oecd: 'data_experiencedT/exposure_function_derivation/ac_oecd_epic.xlsx'
 
 # Years
 future_years: 
@@ -37,18 +36,25 @@ scenario_colors:
   - 'blue'
   - 'red'
 
-countries_highest_pop:
-  - 'CHN'
-  - 'IND'
-  - 'USA'
-  - 'IDN'
-  - 'PAK'
-  - 'BRA'
-  - 'NGA'
+income_groups_colors:
+  low: 'red'
+  lower-middle: 'orange'
+  middle: 'green'
+  upper-middle: 'lightblue'
+  high: 'darkblue'
+  global average: 'black'
 
-continent_colors:
-  Africa: 'red'
-  Asia: 'green'
-  Europe: 'blue'
-  America: 'orange'
-  Oceania: 'purple'
+plotting:
+  experiencedT_max: 4000.
+  experiencedT_cmap: 'inferno_r'
+  exposure_times_cdd_label: 'Experienced CDD (°C days)'
+  contour_levels:
+    absolute: 21
+    low: 21
+    lower-middle: 21
+    middle: 41
+    upper-middle: 51
+    high: 101
+    global average: 41
+  gdp_growth_max: 6.
+  gdp_growth_cmap: 'viridis'
