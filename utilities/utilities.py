@@ -1,43 +1,109 @@
 import numpy as np
 import pandas as pd
 import logging
+import country_converter as coco
 
-def read_ac_data(data_file):
+
+def read_ac_data(infile, year=None, skip=0):
     """
-    Read AC data from file created with derive_exposure_functions.ipynb
+    Read the air conditioning data from the given file
     """
-    ac_data = pd.read_csv(data_file)
-    # Reindex
-    ac_data = ac_data.reset_index(drop=True)
+    # Add AC column to merged_data
+    ac_data = pd.read_csv(infile, skiprows=skip)
+    # Name first column ISO3 and second column AC
+    if year is not None:
+        ac_data = format_eia_data(ac_data, year)
+    else:
+        ac_data = format_gdl_data(ac_data)
+    # Rename country names to ISO3
+    ac_data["ISO3"] = coco.convert(names=ac_data["country"].tolist(), to='ISO3')
+    ac_data["country"] = coco.convert(names=ac_data["ISO3"].tolist(), to='name_short')
+    # AC Given in percent
+    ac_data["AC"] /= 100.
     return ac_data
 
-def read_cdd_data(year, cdd_data_path):
+def format_eia_data(ac_data, year):
+    """
+    Format the EIA data to match the format of the other data
+    """
+    ac_data = ac_data.rename(columns={"Unnamed: 0": "country", "Share of households with AC": "AC"})
+    # Add year column
+    ac_data["Year"] = year
+    return ac_data
+
+def format_gdl_data(ac_data):
+    """
+    Format the GDL data to match the format of the other data
+    """
+    # Drop columns popsize and numhh
+    ac_data = ac_data.drop(columns=["popsize", "numhh"])
+    # Remove empty rows
+    ac_data = ac_data.dropna()
+    # Rename column airco to AC
+    ac_data = ac_data.rename(columns={"airco": "AC", "year": "Year"})
+    # Year column as integer
+    ac_data["Year"] = ac_data["Year"].astype(int)
+    return ac_data
+
+def add_gdp_cdd_data(ac_df, config):
+    """
+    Add GDP and CDD data to the ac_df dataframe
+    """
+    # Read the cooling degree days data
+    dd_data = read_cdd_data(config['cdd_historical_file'])
+    # Read the GDP data
+    gdp_data = read_gdp_data(config['gdp_historical_file'])
+
+    # Add GDP and CDD data to the ac_df dataframe for the respective year and country
+    ac_df = ac_df.merge(dd_data, on=["ISO3", "Year"], how="left")
+    ac_df = ac_df.merge(gdp_data, on=["ISO3", "Year"], how="left")
+    return ac_df
+
+def read_cdd_data(cdd_data_path):
+    """
+    Read in CDD data from file
+    """
     dd_data = pd.read_csv(cdd_data_path)
 
-    # For all countries get the Year 2018 and DD_type CDD18
-    dd_data = dd_data.loc[(dd_data['Year'] == year) & (dd_data['DD_type'] == 'CDD18')]
-    # Drop all columns except ISO3 and DD_mean
-    dd_data = dd_data[['ISO3', 'DD_mean']]
+    # Get the data for the Year and DD_type CDD18
+    dd_data = dd_data.loc[(dd_data['DD_type'] == 'CDD18')] # (dd_data['Year'] == year) & 
+    # Drop all columns except ISO3 and population weighted CDD
+    dd_data = dd_data[['ISO3', 'Year', 'DDPopWeight']]
     #Make ISO3 as index
-    dd_data = dd_data.set_index('ISO3')
+    # dd_data = dd_data.set_index('ISO3')
+    dd_data = dd_data.rename(columns={'DDPopWeight': 'CDD'})
 
     return dd_data
 
-def read_gdp_data(year, gdp_data_path):
+def read_gdp_data(gdp_data_path):
     """
     Read in GDP data from file
     """
     # Open GDP PP file
     # GDP in current $
     gdp_data = pd.read_csv(gdp_data_path, skiprows=4)
-    # Drop all columns except Country Code and year
-    gdp_data = gdp_data[['Country Code', year]]
     # Rename Country Code to ISO3
     gdp_data = gdp_data.rename(columns={'Country Code': 'ISO3'})
-    # Rename year to GDP
-    gdp_data = gdp_data.rename(columns={year: 'GDP'})
-    # Convert from 2017$ to 2018$
-    gdp_data['GDP'] = gdp_data['GDP'] * 1.02
+    # Convert data to long format
+    gdp_data = pd.melt(gdp_data, id_vars=['ISO3'], 
+                    var_name='Year', value_name='GDP per capita PPP')
+
+    # Converting 'Year' to numeric, excluding the 'Unnamed: 67' column which does not represent a year
+    gdp_data = gdp_data[gdp_data['Year'].apply(lambda x: x.isnumeric())]
+
+    # Convert 'Year' from string to integer
+    gdp_data['Year'] = gdp_data['Year'].astype(int)
+
+    gdp_data = gdp_data[['ISO3', 'Year', 'GDP per capita PPP']]
+    gdp_data = gdp_data.dropna()
+    gdp_data = gdp_data.rename(columns={'GDP per capita PPP': 'GDP'})
+
+    # # Rename year to GDP
+    # gdp_data = gdp_data.rename(columns={str(year): 'GDP'})
+    # # Add column for year
+    # gdp_data['Year'] = year
+    # # Convert from 2017$ to 2018$
+    # gdp_data['GDP'] = gdp_data['GDP'] * 1.02
 
     return gdp_data
 
