@@ -4,37 +4,45 @@ logging_level: 'ERROR'
 
 # Files
 
-cdd_historical_file: 'data_experiencedT/historical/DD_ProcessedComplete.csv'
+cdd_historical_file: 'data_experiencedT/historical/IEA-CMCC-WeatherForEnergy-CDD18dailybypop-from-2000-to-2020.csv'
 gdp_historical_file: 'data_experiencedT/historical/API_NY.GDP.PCAP.PP.KD_DS2_en_csv_v2_5873868.csv'
 cdd_projections_file: 'data_experiencedT/projections/ISO_CDD_GDP18_agg_data.csv'
 gdp_projections_file: 'data_experiencedT/projections/gdp_edu_projections.csv'
 
 ac_historical_file_iea: 'data_experiencedT/exposure_function_derivation/percentage-of-households-equiped-with-ac-in-selected-countries-2018.csv'
-ac_historical_file_gdl: 'data_experiencedT/exposure_function_derivation/aircon_gdl.xlsx'
-ac_historical_file_oecd: 'data_experiencedT/exposure_function_derivation/ac_oecd_epic.xlsx'
+ac_historical_file_gdl: 'data_experiencedT/exposure_function_derivation/aircon_gdl.csv'
+ac_historical_file_oecd: 'data_experiencedT/exposure_function_derivation/ac_oecd_epic.csv'
+
+output_path: 'data_experiencedT/heat_exposure_calculations.csv'
+
+# Availability function, either 'power_law' or 'exponential'
+availability_function: 'power_law'
 
 # Years
-future_years: 
-  # - 2040
-  # - 2060
-  # - 2080
-  - 2100
-
-ref_year: 2018
-past_year: 1980
+analysis_years:
+  past_year: 1990
+  ref_year: 2020
+  future_year: 2100
 
 # Scenarios
 base_future_scenario: 'ssp2_rcp45'
 
 future_scenarios:
-  - 'ssp1_rcp26'
+  # - 'ssp1_rcp26'
   - 'ssp2_rcp45'
-  - 'ssp5_rcp60' # don't have data higher than RCP 6.0
+  # - 'ssp5_rcp60' # don't have data higher than RCP 6.0
 
 scenario_colors:
   - 'green'
   - 'blue'
   - 'red'
+
+income_groups:
+  - low
+  - lower-middle
+  - middle
+  - upper-middle
+  - high
 
 income_groups_colors:
   low: 'red'
@@ -42,12 +50,17 @@ income_groups_colors:
   middle: 'green'
   upper-middle: 'lightblue'
   high: 'darkblue'
-  global average: 'black'
+  global average: 'white'
 
 plotting:
   experiencedT_max: 4000.
-  experiencedT_cmap: 'inferno_r'
+  cdd_min: 0.
+  cdd_max: 4000.
+  gdp_max: 175000.
+  gdp_min: 1000.
   exposure_times_cdd_label: 'Experienced CDD (°C days)'
+  cdd_label: 'CDD pop-weighted (°C days)'
+  gdp_label: 'GDP per capita PPP (2017 international $)'
   contour_levels:
     absolute: 21
     low: 21
@@ -57,4 +70,7 @@ plotting:
     high: 101
     global average: 41
   gdp_growth_max: 6.
-  gdp_growth_cmap: 'viridis'
+  experiencedT_cmap: 'inferno_r'
+  gdp_growth_cmap: ' '
+  gdp_cmap: 'copper_r'
+  cdd_cmap: 'YlOrRd'
