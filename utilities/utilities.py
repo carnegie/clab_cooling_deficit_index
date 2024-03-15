@@ -12,6 +12,10 @@ def exp_avail(gdp, a, b):
 def power_avail(gdp, alpha, k):
     return (gdp**alpha / (gdp**alpha + k**alpha))
 
+def exposure_combined_exponential(xdata, cdd_scale, alpha, k):
+    cdd, gdp = xdata
+    return (np.exp(-cdd_scale * ((cdd/1000.)**alpha * (gdp/100000.)**k)))
+
 def exposure_function(xdata, avail_func, cdd_scale, alpha, k):
     """
     This function calculates the exposure of a country to outside temperature
@@ -83,9 +87,11 @@ def read_cdd_data(cdd_data_path):
     """
     cdd_data = pd.read_csv(cdd_data_path)
     # Drop unit column
-    cdd_data = cdd_data.drop(columns=['Unit', 'Territory'])
+    cdd_data = cdd_data.drop(columns=['Unit'])
     # Rename columns
-    cdd_data = cdd_data.rename(columns={'Country': 'ISO3', 'CDD18dailybypop': 'CDD', 'Date': 'Year'})
+    cdd_data = cdd_data.rename(columns={'Country': 'ISO3', 'Territory': 'Country', 'CDD18dailybypop': 'CDD', 'Date': 'Year'})
+    # Round CDD to 5 decimal places
+    cdd_data['CDD'] = cdd_data['CDD'].round(5)
 
     return cdd_data
 
@@ -125,7 +131,7 @@ def fill_missing_country_gdp_data(start_year, data_frame, configs):
         add_value = -1
     for country_name in data_frame['ISO3']:
         data_year = start_year
-        if data_frame[data_frame['ISO3'] == country_name]['GDP'].isnull().values.any():
+        if data_frame[data_frame['ISO3'] == country_name]['GDP'].isnull().values[0]:
             logging.info("No data for {0} in {1}".format(country_name, start_year))
             gdp_data_historical_country = None
             while gdp_data_historical_country == None:
@@ -135,11 +141,16 @@ def fill_missing_country_gdp_data(start_year, data_frame, configs):
                     logging.info("No data for {0} in any year".format(country_name))
                     break
                 gdp_data_historical = read_gdp_data(configs['gdp_historical_file'])
-                if not gdp_data_historical[gdp_data_historical['ISO3'] == country_name]['GDP'].isnull().values.any():
+                gdp_data_historical = gdp_data_historical[gdp_data_historical['Year'] == data_year]
+                if not gdp_data_historical[gdp_data_historical['ISO3'] == country_name]['GDP'].isnull().values[0]:
                     gdp_data_historical_country = gdp_data_historical[gdp_data_historical['ISO3'] == country_name]['GDP'].values[0]
+                    new_data_year = data_year
                     logging.info("Found data for {0} in {1}".format(country_name, data_year))
+                else:
+                    new_data_year = start_year
             # Add GDP data to gdp_data
-            data_frame.loc[data_frame['ISO3'] == country_name, 'GDP'] = gdp_data_historical_country 
+            data_frame.loc[data_frame['ISO3'] == country_name, 'GDP'] = gdp_data_historical_country
+            data_frame.loc[data_frame['ISO3'] == country_name, 'Year'] = int(new_data_year)
 
     return data_frame
 
@@ -161,7 +172,7 @@ def read_projections(configurations, data_type, isin_df):
         projection_df = projection_df_all[projection_df_all['year'] == year]
 
         if data_type == 'cdd':
-            projection_df = projection_df[(projection_df['ssp'] == ssp) & (projection_df['rcp'] == rcp) & (projection_df['stat'] == 'mean')]
+            projection_df = projection_df[(projection_df['ssp'] == ssp) & (projection_df['rcp'] == rcp) & (projection_df['stat'] == 'PopWeightAv')]
             projection_df = projection_df[['ISO', 'value']]
             projection_df = projection_df.rename(columns={'ISO': 'ISO3', 'value': 'CDD_{0}_{1}'.format(scenario, year)})
         elif data_type == 'gdp':
@@ -192,9 +203,13 @@ def gdp_from_cdd_exposure(exposure_cdd, cdd, loaded_parameters, av_func_type):
     """
     cdd_scale, alpha, k = loaded_parameters['cdd_scale'], loaded_parameters['alpha'], loaded_parameters['k']
     if av_func_type == 'power_law':
-        gdp_const = ((exposure_cdd*(k**alpha))/(saturation(cdd,cdd_scale)*cdd-exposure_cdd))**(1./alpha)
-    else:
+        gdp_const = ((k**alpha) * (cdd-exposure_cdd)/ (saturation(cdd,cdd_scale)*cdd - cdd + exposure_cdd))**(1./alpha)
+    elif av_func_type == 'exponential':
         gdp_const = np.log((1./np.exp(alpha))*((saturation(cdd,cdd_scale)/(1 - exposure_cdd/cdd)) - 1))/k
+    elif av_func_type == 'combined_exponential':
+        gdp_const = ( (-1./(cdd_scale*(cdd/1000.)**alpha)) * np.log(exposure_cdd/cdd) )**(1./k) * 100000.
+    else:
+        logging.error("Invalid availability function type")
     return gdp_const
     
 
@@ -205,7 +220,11 @@ def calculate_gdp_const(df, configurations, parameters):
     """
     for scenario in configurations['future_scenarios']:
         gdp_const = gdp_from_cdd_exposure(df['exposure_times_cdd'], 
-                    df['CDD_{0}_{1}'.format(scenario, configurations['analysis_years']['future_year'])], parameters)
+                    df['CDD_{0}_{1}'.format(scenario, configurations['analysis_years']['future_year'])], 
+                    parameters, configurations['availability_function'])
+        # Replace inf with NaN
+        logging.info("Infinite GDP calculated for {0}, possibly 0 CDD".format(gdp_const[gdp_const == np.inf].index))
+        gdp_const[gdp_const == np.inf] = np.nan
         df['gdp_const_{}'.format(scenario)] = calculate_average_gdp_growth(gdp_const, df['GDP'], 
-                configurations['analysis_years']['future_year'] - configurations['analysis_years']['ref_year'])
+                configurations['analysis_years']['future_year'] - df['Year_ref'])
     return df

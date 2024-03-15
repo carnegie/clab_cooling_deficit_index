@@ -8,7 +8,7 @@ import re
 from utilities.utilities import read_gdp_data, gdp_from_cdd_exposure
 import matplotlib.lines as mlines
 from matplotlib.cm import ScalarMappable
-from matplotlib.colors import Normalize
+from matplotlib.colors import Normalize, LogNorm
 
 class ExperiencedTPlot:
     def __init__(self, configurations, ac_data, name_tag, country=None):
@@ -74,7 +74,7 @@ class ExposurePlot(ExperiencedTPlot):
         super().__init__(configurations, ac_data, name_tag, country=country)
         self.scenario = scenario
 
-    def create_data_map(self, exposure_func, scenario):
+    def create_data_map(self):
         """
         Create exposure map
         """
@@ -89,16 +89,7 @@ class ExposurePlot(ExperiencedTPlot):
         merged_data = ac_data_map.merge(world[['geometry', 'iso_a3']], left_on='ISO3', right_on='iso_a3', how='left')
         # Convert the merged data to a GeoDataFrame
         ac_data_map_geo = gpd.GeoDataFrame(merged_data, geometry='geometry')
-        # Add exposure column to geo map
-        # if scenario == 'historical':
-        #     gdp = ac_data_map_geo['GDP']
-        #     cdd = ac_data_map_geo['CDD']
-        # else:
-        #     year = self.configurations['analysis_years']['future_year']
-        #     gdp = ac_data_map_geo['GDP_{0}_{1}'.format(scenario.split("_")[0].upper(), year)]
-        #     cdd = ac_data_map_geo['CDD_{0}_{1}'.format(scenario, year)]
-        
-        # ac_data_map_geo['exposure_calculated'] = exposure_func(gdp, cdd)*cdd
+        # Save geo map in self
         self.ac_data_map_geo = ac_data_map_geo
 
     def plot_map(self, column, colormap, vmin, vmax):
@@ -107,7 +98,7 @@ class ExposurePlot(ExperiencedTPlot):
         """
         # Plot the data
         if 'GDP' in column:
-            self.plot = self.ac_data_map_geo.plot(column=column, cmap=colormap, vmin=vmin, vmax=vmax, norm=matplotlib.colors.LogNorm())
+            self.plot = self.ac_data_map_geo.plot(column=column, cmap=colormap, vmin=vmin, vmax=vmax, norm=LogNorm())
 
         else:
             self.plot = self.ac_data_map_geo.plot(column=column, cmap=colormap, vmin=0, vmax=vmax)
@@ -119,16 +110,31 @@ class ExposurePlot(ExperiencedTPlot):
         """
         # Plot countries with no data in grey
         if self.ac_data_map_geo[self.ac_data_map_geo[column_name].isnull()].shape[0] > 0:
-            self.ac_data_map_geo[self.ac_data_map_geo[column_name].isnull()].plot(color='grey', ax=plt.gca())
+            self.ac_data_map_geo[self.ac_data_map_geo[column_name].isnull()].plot(ax=plt.gca(),
+                hatch='xxx', edgecolor='black', linewidth=0.5, facecolor='none', alpha=0.2)
         
-    def add_colorbar(self, label, colormap, colorbar_max):
+    def add_colorbar(self, label, colormap, colorbar_max, colorbar_min=0):
         """
         Add colorbar
         """
-        norm = Normalize(vmin=0, vmax=colorbar_max)
-        mappable = ScalarMappable(norm=norm, cmap=colormap)
-        mappable._A = []  # This line is necessary for ScalarMappable to work with colorbar
-        plt.colorbar(mappable, label=label, shrink=0.4)
+        if 'GDP per' in label:
+            # Logarithmic colorbar
+            mappable = ScalarMappable(cmap=colormap, norm=LogNorm(vmin=colorbar_min, vmax=colorbar_max))
+        else:
+            norm = Normalize(vmin=colorbar_min, vmax=colorbar_max)
+            mappable = ScalarMappable(norm=norm, cmap=colormap)
+            mappable._A = []  # This line is necessary for ScalarMappable to work with colorbar
+        plt.colorbar(mappable, label=label, shrink=0.5)
+
+    def plot_histogram(self, column):
+        """
+        Plot histogram
+        """
+        # Create a stacked histogram of variable 'column' split by income group
+        bins = np.linspace(0, self.configurations['plotting']['cdd_max'], 6)
+        plt.hist([self.ac_data[self.ac_data['income_group'] == income_group][column] for income_group in self.configurations['income_groups']],
+                 bins=bins, color=[self.configurations['income_groups_colors'][income_group] for income_group in self.configurations['income_groups']], 
+                 stacked=True)
 
 
 class ContourPlot(ExperiencedTPlot):
@@ -167,7 +173,7 @@ class ContourPlot(ExperiencedTPlot):
             n_levels = self.configurations['plotting']['contour_levels']['absolute']
         self.levels = np.linspace(0, self.level_max, n_levels)
         color_map = 'inferno_r'
-
+        
         plt.contourf(self.cdd_x, self.gdp_x, self.contour_function, levels=self.levels, cmap=color_map)
         plt.colorbar(label=self.configurations['plotting']['exposure_times_cdd_label'], ticks=np.linspace(0, self.level_max, 11))
         
@@ -247,7 +253,7 @@ class ContourPlot(ExperiencedTPlot):
         """
         for txt in countries:
             country_index = self.ac_data[self.ac_data.index == txt].index
-            plt.annotate('2020', (self.ac_data['CDD'][country_index]+50, self.ac_data['GDP'][country_index]*0.9),
+            plt.annotate(self.configurations['analysis_years']['ref_year'], (self.ac_data['CDD'][country_index]+50, self.ac_data['GDP'][country_index]*0.9),
                          fontsize=9, color=colors[txt])
 
 
@@ -258,7 +264,7 @@ class GDPIncreaseMap(ExposurePlot):
         parts = self.scenario.split('_')
         self.formatted_scenario = parts[-1][:3].upper() + ' ' + parts[-1][3:4] + '.' + parts[-1][4:]
     
-    def plot_map(self):
+    def plot_growth_map(self):
         """
         Plot maps
         """
@@ -271,7 +277,7 @@ class GDPIncreaseMap(ExposurePlot):
         self.ac_data_map_geo[mean_gdp_growth] = self.ac_data[mean_gdp_growth] * 100.
 
         self.ac_data_map_geo.plot(column=mean_gdp_growth, cmap=self.configurations['plotting']['gdp_growth_cmap'],
-                                  vmin=0.1, vmax=self.configurations['plotting']['gdp_growth_max'])
+                                  vmin=self.configurations['plotting']['gdp_growth_min'], vmax=self.configurations['plotting']['gdp_growth_max'])
 
         
 class GDPIncreaseScatter(GDPIncreaseMap):
@@ -282,6 +288,9 @@ class GDPIncreaseScatter(GDPIncreaseMap):
         """
         Plot scatter plot, color coded by continent
         """
+        # Make square
+        plt.axis('equal')
+        
         for income_group in self.configurations['income_groups_colors'].keys():
             x = self.ac_data[self.ac_data['income_group'] == income_group][data[0]]
             y = self.ac_data[self.ac_data['income_group'] == income_group][data[1]]
@@ -305,4 +314,4 @@ class GDPIncreaseScatter(GDPIncreaseMap):
         min = np.min([np.min(x_all), np.min(y_all)])
         max = np.max([np.max(x_all), np.max(y_all)])
         plt.plot([min, max], [min, max], '--', c='grey')
-        plt.annotate('1:1 line', (max-1.5, max-1), fontsize=12, color='grey', rotation=40)
+        plt.annotate('1:1 line', (max*0.8, max*0.85), fontsize=12, color='grey', rotation=40)

@@ -1,6 +1,6 @@
 # Configuration settings
 
-logging_level: 'ERROR'
+logging_level: 'INFO'
 
 # Files
 
@@ -15,18 +15,16 @@ ac_historical_file_oecd: 'data_experiencedT/exposure_function_derivation/ac_oecd
 
 output_path: 'data_experiencedT/heat_exposure_calculations.csv'
 
-# Availability function, either 'power_law' or 'exponential'
-availability_function: 'power_law'
+# Availability function, either 'power_law' or 'exponential' or 'combined_exponential'
+availability_function: 'combined_exponential'
 
 # Years
 analysis_years:
   past_year: 1990
-  ref_year: 2020
+  ref_year: 2019
   future_year: 2100
 
 # Scenarios
-base_future_scenario: 'ssp2_rcp45'
-
 future_scenarios:
   # - 'ssp1_rcp26'
   - 'ssp2_rcp45'
@@ -53,10 +51,10 @@ income_groups_colors:
   global average: 'white'
 
 plotting:
-  experiencedT_max: 4000.
+  experiencedT_max: 5000.
   cdd_min: 0.
-  cdd_max: 4000.
-  gdp_max: 175000.
+  cdd_max: 5000.
+  gdp_max: 100000.
   gdp_min: 1000.
   exposure_times_cdd_label: 'Experienced CDD (°C days)'
   cdd_label: 'CDD pop-weighted (°C days)'
@@ -69,8 +67,9 @@ plotting:
     upper-middle: 51
     high: 101
     global average: 41
-  gdp_growth_max: 6.
+  gdp_growth_min: 0.
+  gdp_growth_max: 5.
   experiencedT_cmap: 'inferno_r'
-  gdp_growth_cmap: ' '
-  gdp_cmap: 'copper_r'
-  cdd_cmap: 'YlOrRd'
+  cdd_cmap: 'inferno_r'
+  gdp_growth_cmap: 'summer'
+  gdp_cmap: 'viridis'
