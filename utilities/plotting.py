@@ -16,7 +16,7 @@ def plot_variable_map(configurations, heat_exposure_df, plotting_variable):
     map_plot.add_colorbar(label=configurations['plotting'][plotting_variable.split('_')[0].lower()+'_label'], 
                           colormap=colormap,
                           colorbar_max=configurations['plotting'][plotting_variable.split('_')[0].lower()+'_max'],
-                          colorbar_min=configurations['plotting'][plotting_variable.split('_')[0].lower()+'_min'])
+                          colorbar_min=configurations['plotting'][plotting_variable.split('_')[0].lower()+'_min'])    
     map_plot.add_title(plotting_variable, fontsize=12)
     map_plot.save_figure()
 
@@ -44,16 +44,17 @@ def plot_exposure_map(configurations, ac_data_historical, exposure_func, scenari
     exposure_map.add_title(scenario, fontsize=12)
     exposure_map.save_figure()
 
-def plot_exposure_contour(configurations, exposure_function, ac_data, x_y_ranges, scenario=None, country=None, name_tag='exposure_contour', control=False):
+def plot_exposure_contour(configurations, exposure_function, ac_data, x_y_ranges, country=None, name_tag='exposure_contour', control=False):
     """
     Contour plot of penetration of air conditioning as a function of GDP per capita and cooling degree days
     """
-    contour_plot = ContourPlot(configurations, ac_data, name_tag, scenario, country=country)
+    contour_plot = ContourPlot(configurations, ac_data, name_tag, country=country)
     contour_plot.contour_grid(x_y_ranges[0], x_y_ranges[1])
     contour_plot.calculate_contour(exposure_function)
     contour_plot.plot_contour()
-    contour_plot.add_contour_lines(exposure_function, configurations['income_groups_colors'])
+    contour_plot.add_contour_lines(exposure_function)
     if not control:
+        contour_plot.add_const_heat_exposure_lines(exposure_function, configurations['income_groups_colors'])
         data_points = configurations['income_groups_colors'].keys()
         data_color = configurations['income_groups_colors']
         if not country:
@@ -62,12 +63,11 @@ def plot_exposure_contour(configurations, exposure_function, ac_data, x_y_ranges
     else:
         data_color = 'grey'
         contour_plot.add_control_data(data_color)
-        # ISO3 values where 'AC' has a value in ac_data
         data_points = ac_data[ac_data['AC'].notnull()]['ISO3'].unique()
 
     if not country:
         contour_plot.set_y_log()
-        contour_plot.add_country_labels(data_points, data_color)
+        contour_plot.add_country_labels(data_points, data_color, control=control)
         contour_plot.add_x_y_labels(configurations['plotting']['cdd_label'], configurations['plotting']['gdp_label'])
         
     else:
@@ -77,7 +77,6 @@ def plot_exposure_contour(configurations, exposure_function, ac_data, x_y_ranges
         cc = coco.CountryConverter()
         country = cc.convert(names=country, to='name_short', not_found=None)
         contour_plot.add_title(country, fontsize=14)
-
     contour_plot.save_figure()
 
 def plot_gdp_increase_map(configurations, gdp_cdd_data, future_scenario):
@@ -86,14 +85,17 @@ def plot_gdp_increase_map(configurations, gdp_cdd_data, future_scenario):
     """
     if not future_scenario == 'historical':
         rcp_scenario = future_scenario.split('_')[1]
+        scenario_title = rcp_scenario + ' {0}-{1}'.format(configurations['analysis_years']['ref_year'], configurations['analysis_years']['future_year'])
     else:
         rcp_scenario = future_scenario
+        scenario_title = rcp_scenario + ' {0}-{1}'.format(configurations['analysis_years']['past_year'], configurations['analysis_years']['ref_year'])
+
     gdp_increase_plot = GDPIncreaseMap(configurations, gdp_cdd_data, 'gdp_increase_map_{0}'.format(rcp_scenario), future_scenario)
     gdp_increase_plot.create_data_map()
     gdp_increase_plot.plot_growth_map()
     gdp_increase_plot.grey_empty_countries(gdp_increase_plot.column_name)
     gdp_increase_plot.remove_axes_ticks()
-    gdp_increase_plot.add_title(rcp_scenario, fontsize=12)
+    gdp_increase_plot.add_title(scenario_title, fontsize=12)
     gdp_increase_plot.add_colorbar(label='Mean annual GDP growth (%)', colormap=configurations['plotting']['gdp_growth_cmap'],
                                    colorbar_max=configurations['plotting']['gdp_growth_max'],
                                    colorbar_min=configurations['plotting']['gdp_growth_min'])
@@ -115,7 +117,6 @@ def plot_cdd_scatter(configurations, gdp_cdd_data, future_scenario):
     """
     gdp_increase_scatter = GDPIncreaseScatter(configurations, gdp_cdd_data, 'cdd_scatter_{0}'.format(future_scenario), future_scenario)
     gdp_increase_scatter.plot_scatter(['CDD', 'CDD_{0}_2100'.format(future_scenario)])
-    gdp_increase_scatter.add_x_y_labels('CDD in 2020 (°C days)', 'CDD in 2100\nunder {0} (°C days)'.format(gdp_increase_scatter.formatted_scenario))
-    print("Draw 1:1")
+    gdp_increase_scatter.add_x_y_labels('CDD in {0} (°C days)'.format(configurations['analysis_years']['ref_year']), 'CDD in 2100\nunder {0} (°C days)'.format(gdp_increase_scatter.formatted_scenario))
     gdp_increase_scatter.add_1_to_1_line(['CDD', 'CDD_{0}_2100'.format(future_scenario)])
     gdp_increase_scatter.save_figure()

@@ -26,9 +26,9 @@ analysis_years:
 
 # Scenarios
 future_scenarios:
-  # - 'ssp1_rcp26'
+  - 'ssp1_rcp26'
   - 'ssp2_rcp45'
-  # - 'ssp5_rcp60' # don't have data higher than RCP 6.0
+  - 'ssp5_rcp60' # don't have data higher than RCP 6.0
 
 scenario_colors:
   - 'green'
@@ -56,9 +56,9 @@ plotting:
   cdd_max: 5000.
   gdp_max: 100000.
   gdp_min: 1000.
-  exposure_times_cdd_label: 'Experienced CDD (°C days)'
+  exposure_times_cdd_label: 'Heat exposure (°C days)'
   cdd_label: 'CDD pop-weighted (°C days)'
-  gdp_label: 'GDP per capita PPP (2017 international $)'
+  gdp_label: 'GDP per capita PPP (2017 int. $)'
   contour_levels:
     absolute: 21
     low: 21
@@ -69,7 +69,7 @@ plotting:
     global average: 41
   gdp_growth_min: 0.
   gdp_growth_max: 5.
-  experiencedT_cmap: 'inferno_r'
+  exposure_times_cdd_cmap: 'inferno_r'
   cdd_cmap: 'inferno_r'
-  gdp_growth_cmap: 'summer'
-  gdp_cmap: 'viridis'
+  gdp_growth_cmap: 'viridis'
+  gdp_cmap: 'summer'

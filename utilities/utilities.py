@@ -155,7 +155,7 @@ def fill_missing_country_gdp_data(start_year, data_frame, configs):
     return data_frame
 
 
-def read_projections(configurations, data_type, isin_df):
+def read_projections(configurations, data_type, isin_df, year):
     """
     Read in projections from file
     """
@@ -164,7 +164,6 @@ def read_projections(configurations, data_type, isin_df):
     # Select scenarios
     output_df = pd.DataFrame()
     for scenario in configurations['future_scenarios']:
-        year = configurations['analysis_years']['future_year']
            
         ssp = scenario.split('_')[0].upper()
         rcp = scenario.split('_')[1]

@@ -96,10 +96,9 @@ class ExposurePlot(ExperiencedTPlot):
         """
         Plot exposure map
         """
-        # Plot the data
+        # Log scale for GDP
         if 'GDP' in column:
             self.plot = self.ac_data_map_geo.plot(column=column, cmap=colormap, vmin=vmin, vmax=vmax, norm=LogNorm())
-
         else:
             self.plot = self.ac_data_map_geo.plot(column=column, cmap=colormap, vmin=0, vmax=vmax)
 
@@ -109,9 +108,12 @@ class ExposurePlot(ExperiencedTPlot):
         Grey out countries with no data
         """
         # Plot countries with no data in grey
-        if self.ac_data_map_geo[self.ac_data_map_geo[column_name].isnull()].shape[0] > 0:
-            self.ac_data_map_geo[self.ac_data_map_geo[column_name].isnull()].plot(ax=plt.gca(),
-                hatch='xxx', edgecolor='black', linewidth=0.5, facecolor='none', alpha=0.2)
+        empty_countries = self.ac_data_map_geo[self.ac_data_map_geo[column_name].isnull()]
+        if empty_countries.shape[0] > 0:
+            empty_countries = empty_countries[empty_countries['geometry'].notnull()]
+            empty_countries.plot(ax=plt.gca(), hatch='xxx', edgecolor='black', linewidth=0.5, 
+                                 facecolor='none', alpha=0.2)
+        plt.gca().set_aspect('equal', adjustable='box')
         
     def add_colorbar(self, label, colormap, colorbar_max, colorbar_min=0):
         """
@@ -138,10 +140,9 @@ class ExposurePlot(ExperiencedTPlot):
 
 
 class ContourPlot(ExperiencedTPlot):
-    def __init__(self, configurations, ac_data, name_tag, scenario, country=None):
+    def __init__(self, configurations, ac_data, name_tag, country=None):
         # Call parent class constructor
         super().__init__(configurations, ac_data, name_tag, country=country)
-        self.scenario = scenario
 
     def contour_grid(self, cdd_range, gdp_range):
         """
@@ -172,12 +173,12 @@ class ContourPlot(ExperiencedTPlot):
         else:
             n_levels = self.configurations['plotting']['contour_levels']['absolute']
         self.levels = np.linspace(0, self.level_max, n_levels)
-        color_map = 'inferno_r'
+        color_map = self.configurations['plotting']['exposure_times_cdd_cmap']
         
         plt.contourf(self.cdd_x, self.gdp_x, self.contour_function, levels=self.levels, cmap=color_map)
         plt.colorbar(label=self.configurations['plotting']['exposure_times_cdd_label'], ticks=np.linspace(0, self.level_max, 11))
         
-    def add_contour_lines(self, exposure_function, const_heat_exposure=None):
+    def add_contour_lines(self, exposure_function):
         """
         Add contour lines
         """
@@ -185,6 +186,7 @@ class ContourPlot(ExperiencedTPlot):
         plt.clabel(clines, self.levels[::2], fmt='%d', fontsize=8, colors='black')
         plt.clim(0, self.levels[-1])
 
+    def add_const_heat_exposure_lines(self, exposure_function, const_heat_exposure):
         # Add constant exposure times CDD line
         # self.const_level = [exposure_function(self.gdp_country*(1.**(self.configurations['analysis_years']['future_year']-self.configurations['analysis_years']['ref_year'])), self.cdd_country)*self.cdd_country]
         for line in const_heat_exposure.keys():
@@ -209,8 +211,9 @@ class ContourPlot(ExperiencedTPlot):
         Add AC data for control plots
         """
         # Print AC data when not null
-        plt.scatter(self.ac_data['GDP'], self.ac_data['CDD'], c=(1.-self.ac_data['AC'])*self.ac_data['CDD'], cmap='inferno_r', 
-                    vmin=0., vmax=self.level_max,  s=12, edgecolors=color, label='AC data')
+        plt.scatter(self.ac_data['CDD'], self.ac_data['GDP'], c=(1.-self.ac_data['AC']) * self.ac_data['CDD'], 
+                    cmap=self.configurations['plotting']['exposure_times_cdd_cmap'], 
+                    vmin=0., vmax=self.level_max,  s=16, edgecolors=color, label='AC data')
 
     def add_cdd_predictions(self):
         """
@@ -247,14 +250,26 @@ class ContourPlot(ExperiencedTPlot):
             plt.annotate(formatted_string, (self.gdp_x[0][0], future_cdd_scenario), 
                          fontsize=8.5, color=self.configurations['scenario_colors'][isc])
     
-    def add_country_labels(self, countries, colors):
+    def add_country_labels(self, countries, colors, control):
         """
-        Label points with country names
-        """
+        Label points with country names in control plot and year in main plot
+        """ 
         for txt in countries:
-            country_index = self.ac_data[self.ac_data.index == txt].index
-            plt.annotate(self.configurations['analysis_years']['ref_year'], (self.ac_data['CDD'][country_index]+50, self.ac_data['GDP'][country_index]*0.9),
-                         fontsize=9, color=colors[txt])
+            if control:
+                color = colors
+                label = txt
+                fontsize=6
+                id = self.ac_data['ISO3']
+            else:
+                color = colors[txt]
+                label = self.configurations['analysis_years']['ref_year']
+                fontsize=9
+                id = self.ac_data.index
+
+            country_index = self.ac_data[id == txt].index
+
+            plt.annotate(label, (self.ac_data['CDD'][country_index]+50, self.ac_data['GDP'][country_index]*0.9),
+                         fontsize=fontsize, color=color)
 
 
 class GDPIncreaseMap(ExposurePlot):
@@ -288,8 +303,8 @@ class GDPIncreaseScatter(GDPIncreaseMap):
         """
         Plot scatter plot, color coded by continent
         """
-        # Make square
-        plt.axis('equal')
+        # Make distance between axes ticks the same for both axes
+        plt.gca().set_aspect('equal', adjustable='box')
         
         for income_group in self.configurations['income_groups_colors'].keys():
             x = self.ac_data[self.ac_data['income_group'] == income_group][data[0]]
@@ -299,6 +314,7 @@ class GDPIncreaseScatter(GDPIncreaseMap):
                 y = y*100
             plt.scatter(x, y, label=income_group,
                  c=self.configurations['income_groups_colors'][income_group], s=8, marker='o')
+        
     
 
     def add_1_to_1_line(self, data):
