@@ -9,6 +9,8 @@ from utilities.utilities import read_gdp_data, gdp_from_cdd_exposure
 import matplotlib.lines as mlines
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Normalize, LogNorm
+from statsmodels.graphics.plot_grids import scatter_ellipse
+
 
 class ExperiencedTPlot:
     def __init__(self, configurations, ac_data, name_tag, country=None):
@@ -111,9 +113,21 @@ class ExposurePlot(ExperiencedTPlot):
         empty_countries = self.ac_data_map_geo[self.ac_data_map_geo[column_name].isnull()]
         if empty_countries.shape[0] > 0:
             empty_countries = empty_countries[empty_countries['geometry'].notnull()]
-            empty_countries.plot(ax=plt.gca(), hatch='xxx', edgecolor='black', linewidth=0.5, 
-                                 facecolor='none', alpha=0.2)
+            empty_countries.plot(ax=plt.gca(), color='lightgrey')
         plt.gca().set_aspect('equal', adjustable='box')
+
+    def color_countries(self, color, group_label):
+        """
+        Color countries that have data
+        """
+        self.ac_data_map_geo.plot(ax=plt.gca(), edgecolor='grey', color='white')
+        income_group_countries = self.ac_data_map_geo[self.ac_data_map_geo['income_group'] == group_label]
+        income_group_countries.plot(ax=plt.gca(), color=color)
+        # Remove black frame around plot
+        for spine in plt.gca().spines.values():
+            spine.set_visible(False)
+
+
         
     def add_colorbar(self, label, colormap, colorbar_max, colorbar_min=0):
         """
@@ -126,17 +140,34 @@ class ExposurePlot(ExperiencedTPlot):
             norm = Normalize(vmin=colorbar_min, vmax=colorbar_max)
             mappable = ScalarMappable(norm=norm, cmap=colormap)
             mappable._A = []  # This line is necessary for ScalarMappable to work with colorbar
-        plt.colorbar(mappable, label=label, shrink=0.5)
+        plt.colorbar(mappable, label=label, shrink=0.45)
 
     def plot_histogram(self, column):
         """
-        Plot histogram
+        Plot PDF
         """
-        # Create a stacked histogram of variable 'column' split by income group
-        bins = np.linspace(0, self.configurations['plotting']['cdd_max'], 6)
-        plt.hist([self.ac_data[self.ac_data['income_group'] == income_group][column] for income_group in self.configurations['income_groups']],
-                 bins=bins, color=[self.configurations['income_groups_colors'][income_group] for income_group in self.configurations['income_groups']], 
-                 stacked=True)
+        from scipy.stats import gaussian_kde
+        offset = np.zeros(1000)
+        # Draw a probability density function for each income group and for all countries bound in the range of the data
+        for income_group in self.configurations['income_groups_colors'].keys():
+            # Fill distribution with color
+            kde = gaussian_kde(self.ac_data[self.ac_data['income_group'] == income_group][column].dropna())
+            # Plot the distribution
+            x = np.linspace(0, 5000, 1000)
+            plt.fill_between(x, offset, offset + kde(x), edgecolor='none', alpha=0.5,
+                             color=self.configurations['income_groups_colors'][income_group])
+            offset += kde(x)
+
+            # self.ac_data[self.ac_data['income_group'] == income_group][column].dropna().plot(kind='kde', 
+            #     label=income_group, color=self.configurations['income_groups_colors'][income_group])
+        # self.ac_data[column].dropna().plot(kind='kde', label='All countries', color='black')
+        # Set x range from 0 to 5000
+        plt.xlim(0, 4000)
+        if not 'diff' in column:
+            plt.ylim(0, 0.003)
+
+        else:
+            plt.ylim(0, 0.01)        
 
 
 class ContourPlot(ExperiencedTPlot):
@@ -262,7 +293,7 @@ class ContourPlot(ExperiencedTPlot):
                 id = self.ac_data['ISO3']
             else:
                 color = colors[txt]
-                label = self.configurations['analysis_years']['ref_year']
+                label = txt
                 fontsize=9
                 id = self.ac_data.index
 
@@ -299,25 +330,62 @@ class GDPIncreaseScatter(GDPIncreaseMap):
     def __init__(self, configurations, ac_data, name_tag, scenario, country=None):
         super().__init__(configurations, ac_data, name_tag, scenario, country=country)
 
-    def plot_scatter(self, data):
+    def plot_scatter(self, data, groups):
         """
         Plot scatter plot, color coded by continent
         """
-        # Make distance between axes ticks the same for both axes
-        plt.gca().set_aspect('equal', adjustable='box')
-        
-        for income_group in self.configurations['income_groups_colors'].keys():
+
+        self.fig, self.ax = plt.subplots()
+        self.ax.set_aspect('equal', adjustable='box')
+
+        for income_group in groups:
             x = self.ac_data[self.ac_data['income_group'] == income_group][data[0]]
             y = self.ac_data[self.ac_data['income_group'] == income_group][data[1]]
             if 'gdp' in data[0]:
-                x = x*100
-                y = y*100
-            plt.scatter(x, y, label=income_group,
-                 c=self.configurations['income_groups_colors'][income_group], s=8, marker='o')
+                x = x * 100
+                y = y * 100
+            self.ax.scatter(x, y, label=income_group, s=10, marker='o',
+                    c=self.configurations['income_groups_colors'][income_group])
+            
+            if len(groups) == 1:
+                self.ax.set_xlim(-2., 10.)
+                self.ax.set_ylim(-2., 10.)
+            else:
+                self.ax.set_xlim(0., 4000.)
+                self.ax.set_ylim(0., 4000.)
+
+            # Plot GDP growth to obtain high income group average exposure*CDD
+            if data[2] is not None:
+                # Only show for countries with lower exposure*CDD than high income group average
+                y2 = self.ac_data[self.ac_data['income_group'] == income_group][data[2]].clip(lower=0)
+                if 'gdp' in data[2]:
+                    y2 = y2 * 100
+                self.ax.scatter(x, y2, label=income_group, s=10, marker='o', linewidth=0.5,
+                        edgecolors=self.configurations['income_groups_colors'][income_group], facecolors='none')
+
+
+    def confidence_ellipse_median(self, x_val, y_val, ax, n_std=2.4477, facecolor='none'):
+        """
+        Create a plot of the covariance confidence ellipse of *x* and *y*,
+        centered around the median of the data instead of the mean.
+        """
+        from matplotlib.patches import Ellipse
+        median_x = np.median(x_val)
+        median_y = np.median(y_val)
+
+        cov = np.cov(x_val, y_val)
+        eigenvalues, eigenvectors = np.linalg.eig(cov)
+        eigenvalues = np.sqrt(eigenvalues)
+        
+        ellipse = Ellipse(xy=(median_x, median_y),
+                    width=eigenvalues[0]*n_std*2, height=eigenvalues[1]*n_std*2,
+                    angle=np.rad2deg(np.arccos(eigenvectors[0, 0])), alpha=0.3, facecolor=facecolor)
+        
+        ax.add_artist(ellipse)
         
     
 
-    def add_1_to_1_line(self, data):
+    def add_1_to_1_line(self, data, min=None, max=None):
         """
         Add line where historical and constant GDP growth are equal
         """
@@ -327,7 +395,8 @@ class GDPIncreaseScatter(GDPIncreaseMap):
         if 'gdp' in data[0]:
             x_all = x_all*100
             y_all = y_all*100
-        min = np.min([np.min(x_all), np.min(y_all)])
-        max = np.max([np.max(x_all), np.max(y_all)])
+        if not max:
+            min = np.min([np.min(x_all), np.min(y_all)])
+            max = np.max([np.max(x_all), np.max(y_all)])
         plt.plot([min, max], [min, max], '--', c='grey')
         plt.annotate('1:1 line', (max*0.8, max*0.85), fontsize=12, color='grey', rotation=40)

@@ -213,17 +213,24 @@ def gdp_from_cdd_exposure(exposure_cdd, cdd, loaded_parameters, av_func_type):
     
 
 
-def calculate_gdp_const(df, configurations, parameters):
+def calculate_gdp_const(df, configurations, parameters, exp_cdd=None):
     """
     This function calculates the GDP to keep heat exposure constant
     """
+    if exp_cdd is None:
+        exp_cdd = df['exposure_times_cdd']
+        label = ''
+    else:
+        label = '_custom_exp_cdd'
     for scenario in configurations['future_scenarios']:
-        gdp_const = gdp_from_cdd_exposure(df['exposure_times_cdd'], 
+        gdp_const = gdp_from_cdd_exposure(exp_cdd, 
                     df['CDD_{0}_{1}'.format(scenario, configurations['analysis_years']['future_year'])], 
                     parameters, configurations['availability_function'])
         # Replace inf with NaN
         logging.info("Infinite GDP calculated for {0}, possibly 0 CDD".format(gdp_const[gdp_const == np.inf].index))
         gdp_const[gdp_const == np.inf] = np.nan
-        df['gdp_const_{}'.format(scenario)] = calculate_average_gdp_growth(gdp_const, df['GDP'], 
+        df['gdp_const_{0}{1}'.format(scenario, label)] = calculate_average_gdp_growth(gdp_const, df['GDP'], 
                 configurations['analysis_years']['future_year'] - df['Year_ref'])
+        # Set all negative values to NaN
+        df.loc[df['gdp_const_{0}{1}'.format(scenario, label)] < 0, 'gdp_const_{0}{1}'.format(scenario, label)] = np.nan
     return df
