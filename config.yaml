@@ -1,9 +1,7 @@
 # Configuration settings
-
 logging_level: 'INFO'
 
 # Files
-
 cdd_historical_file: 'data_experiencedT/historical/IEA-CMCC-WeatherForEnergy-CDD18dailybypop-from-2000-to-2020.csv'
 gdp_historical_file: 'data_experiencedT/historical/API_NY.GDP.PCAP.PP.KD_DS2_en_csv_v2_5873868.csv'
 cdd_projections_file: 'data_experiencedT/projections/ISO_CDD_GDP18_agg_data.csv'
@@ -13,9 +11,11 @@ ac_historical_file_iea: 'data_experiencedT/exposure_function_derivation/percenta
 ac_historical_file_gdl: 'data_experiencedT/exposure_function_derivation/aircon_gdl.csv'
 ac_historical_file_oecd: 'data_experiencedT/exposure_function_derivation/ac_oecd_epic.csv'
 
-output_path: 'data_experiencedT/heat_exposure_calculations.csv'
+world_bank_income_groups_file: 'data_experiencedT/CLASS.xlsx'
 
-# Availability function, either 'power_law' or 'exponential' or 'combined_exponential'
+output_path: 'data_experiencedT/cooling_deficit_index_calculations.csv'
+
+# Availability function, either 'exponential' or 'combined_exponential'
 availability_function: 'combined_exponential'
 
 # Years
@@ -28,48 +28,33 @@ analysis_years:
 future_scenarios:
   - 'ssp1_rcp26'
   - 'ssp2_rcp45'
-  - 'ssp5_rcp60' # don't have data higher than RCP 6.0
+  - 'ssp5_rcp60'
 
-scenario_colors:
-  - 'green'
-  - 'blue'
-  - 'red'
-
-income_groups:
-  - low
-  - lower-middle
-  - middle
-  - upper-middle
-  - high
-
+# Income groups
 income_groups_colors:
-  low: 'red'
-  lower-middle: 'orange'
-  middle: 'green'
-  upper-middle: 'lightblue'
-  high: 'darkblue'
-  # global average: 'white'
+  low: 'fuchsia'
+  lower middle: 'orange'
+  upper middle: 'cyan'
+  high: 'blue'
 
+# Plotting settings
 plotting:
-  experiencedT_max: 5000.
+  # Ranges
+  cooling_deficit_index_max: 5000.
   cdd_min: 0.
-  cdd_max: 5000.
+  cdd_max: 4000.
+  cdd_diff_max: 2000.
   gdp_max: 100000.
   gdp_min: 1000.
-  exposure_times_cdd_label: 'Heat exposure (°C days)'
-  cdd_label: 'Cooling Degree Days (°C days)'
-  gdp_label: 'GDP per capita (2017 int. $)'
-  contour_levels:
-    absolute: 21
-    low: 21
-    lower-middle: 21
-    middle: 41
-    upper-middle: 51
-    high: 101
-    global average: 41
+  contour_levels: 21
   gdp_growth_min: 0.
   gdp_growth_max: 5.
-  exposure_times_cdd_cmap: 'inferno_r'
-  cdd_cmap: 'plasma_r'
-  gdp_growth_cmap: 'viridis'
+  # Labels
+  exposure_times_cdd_label: 'Cooling Deficit Index (°C days)'
+  cdd_label: 'Cooling Degree Days (°C days)'
+  gdp_label: 'GDP per capita (2017 int. $)'
+  # Color maps
+  cdd_cmap: 'autumn_r'
   gdp_cmap: 'summer'
+  exposure_times_cdd_cmap: 'inferno_r'
+  ac_adoption_cmap: 'viridis'

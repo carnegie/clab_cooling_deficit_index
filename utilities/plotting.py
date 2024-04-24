@@ -27,7 +27,7 @@ def plot_income_groups(configurations, heat_exposure_df):
     """
     Highlight countries in each income group
     """
-    for income_gr in configurations['income_groups']:
+    for income_gr in configurations['income_groups_colors'].keys():
         map_plot_countries = ExposurePlot(configurations, heat_exposure_df, '{0}_map'.format(income_gr))
         map_plot_countries.create_data_map()
         map_plot_countries.color_countries(configurations['income_groups_colors'][income_gr], income_gr)
@@ -40,7 +40,8 @@ def plot_variable_histogram(configurations, heat_exposure_df, plotting_variable)
     Plot histogram of the variable
     """
     histogram_plot = ExposurePlot(configurations, heat_exposure_df, '{0}_histogram'.format(plotting_variable))
-    histogram_plot.plot_histogram(plotting_variable)
+    x_max = (plotting_variable.lower() if len(plotting_variable.split('_')) == 1 else (plotting_variable.split('_')[0]+"_"+plotting_variable.split('_')[-1]).lower()) + '_max'
+    histogram_plot.plot_histogram(plotting_variable, configurations['plotting'][x_max])
     histogram_plot.add_x_y_labels(configurations['plotting'][plotting_variable.split('_')[0].lower()+'_label'], 'Frequency')
     histogram_plot.add_title(plotting_variable, fontsize=12)
     histogram_plot.save_figure()
@@ -59,39 +60,21 @@ def plot_exposure_map(configurations, ac_data_historical, exposure_func, scenari
     exposure_map.add_title(scenario, fontsize=12)
     exposure_map.save_figure()
 
-def plot_exposure_contour(configurations, exposure_function, ac_data, x_y_ranges, country=None, name_tag='exposure_contour', control=False):
+def plot_exposure_contour(configurations, exposure_function, ac_data, x_y_ranges, country=None, name_tag='exposure_contour', multiply_cdd=True):
     """
     Contour plot of penetration of air conditioning as a function of GDP per capita and cooling degree days
     """
     contour_plot = ContourPlot(configurations, ac_data, name_tag, country=country)
     contour_plot.contour_grid(x_y_ranges[0], x_y_ranges[1])
-    contour_plot.calculate_contour(exposure_function)
-    contour_plot.plot_contour()
-    # contour_plot.add_contour_lines(exposure_function)
-    if not control:
-        # contour_plot.add_const_heat_exposure_lines(exposure_function, configurations['income_groups_colors'])
-        data_points = configurations['income_groups_colors'].keys()
-        data_color = configurations['income_groups_colors']
-        if not country:
-            contour_plot.add_data()
-
-    else:
-        data_color = 'grey'
-        contour_plot.add_control_data(data_color)
-        data_points = ac_data[ac_data['AC'].notnull()]['ISO3'].unique()
-
-    if not country:
-        contour_plot.set_y_log()
-        contour_plot.add_country_labels(data_points, data_color, control=control)
-        contour_plot.add_x_y_labels(configurations['plotting']['cdd_label'], configurations['plotting']['gdp_label'])
-        
-    else:
-        contour_plot.add_cdd_predictions()
-        contour_plot.add_x_y_labels('Mean GDP growth (annual %)', 'Cooling degree days increase (%)')
-        # Replace ISO3 with full name
-        cc = coco.CountryConverter()
-        country = cc.convert(names=country, to='name_short', not_found=None)
-        contour_plot.add_title(country, fontsize=14)
+    contour_plot.calculate_contour(exposure_function, multiply_cdd)
+    contour_plot.plot_contour(multiply_cdd)
+    contour_plot.add_contour_lines(multiply_cdd)
+    data_points = configurations['income_groups_colors'].keys()
+    data_color = configurations['income_groups_colors']
+    contour_plot.add_data()
+    contour_plot.set_y_log()
+    contour_plot.add_country_labels(data_points, data_color)
+    contour_plot.add_x_y_labels(configurations['plotting']['cdd_label'], configurations['plotting']['gdp_label'])
     contour_plot.save_figure()
 
 def plot_gdp_increase_map(configurations, gdp_cdd_data, future_scenario):
@@ -120,7 +103,7 @@ def plot_gdp_increase_scatter(configurations, gdp_cdd_data, future_scenario):
     """
     Plot difference in exposure times CDD as a function of GDP per capita
     """
-    for income_group in configurations['income_groups']:
+    for income_group in configurations['income_groups_colors'].keys():
         gdp_increase_scatter = GDPIncreaseScatter(configurations, gdp_cdd_data[gdp_cdd_data['income_group'] == income_group],
                             'gdp_increase_scatter_{0}_{1}'.format(future_scenario, income_group), future_scenario)
         gdp_increase_scatter.plot_scatter(['gdp_historical_growth', 'gdp_const_{0}'.format(future_scenario), 
@@ -136,14 +119,14 @@ def plot_cdd_scatter(configurations, gdp_cdd_data, future_scenario):
     for appendix in ['', '_diff']:
         gdp_increase_scatter = GDPIncreaseScatter(configurations, gdp_cdd_data, 'cdd_scatter_{0}{1}'.format(future_scenario, appendix), future_scenario)
         gdp_increase_scatter.plot_scatter(['CDD', 'CDD_{0}_2100{1}'.format(future_scenario, appendix), None],
-                            configurations['income_groups'])
+                            configurations['income_groups_colors'].keys())
         if appendix == '':
             gdp_increase_scatter.add_1_to_1_line(['CDD', 'CDD_{0}_2100'.format(future_scenario)])
             add_label = ''
         else:
             add_label = 'difference '
         gdp_increase_scatter.add_x_y_labels('CDD in {0} (°C days)'.format(configurations['analysis_years']['ref_year']), 'CDD {0}in 2100\nunder {1} (°C days)'.format(add_label, gdp_increase_scatter.formatted_scenario))
-        for income_group in configurations['income_groups']:
+        for income_group in configurations['income_groups_colors'].keys():
             # Get values without NaNs
             gdp_cdd_data = gdp_cdd_data.dropna(subset=['CDD', 'CDD_{0}_2100{1}'.format(future_scenario, appendix)])
             cdd = gdp_cdd_data['CDD'][gdp_cdd_data['income_group'] == income_group].values

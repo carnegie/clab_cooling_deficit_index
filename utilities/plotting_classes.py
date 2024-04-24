@@ -4,12 +4,8 @@ import matplotlib
 import geopandas as gpd
 import country_converter as coco
 import numpy as np
-import re
-from utilities.utilities import read_gdp_data, gdp_from_cdd_exposure
-import matplotlib.lines as mlines
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Normalize, LogNorm
-from statsmodels.graphics.plot_grids import scatter_ellipse
 
 
 class ExperiencedTPlot:
@@ -142,32 +138,32 @@ class ExposurePlot(ExperiencedTPlot):
             mappable._A = []  # This line is necessary for ScalarMappable to work with colorbar
         plt.colorbar(mappable, label=label, shrink=0.45)
 
-    def plot_histogram(self, column):
+    def plot_histogram(self, column, x_max):
         """
-        Plot PDF
+        Plot kernel density estimate of CDD data
         """
-        from scipy.stats import gaussian_kde
-        offset = np.zeros(1000)
         # Draw a probability density function for each income group and for all countries bound in the range of the data
+        # Normalize the data such that the maximum value is 1
+        norm_kde_max = 0
+        kdes = []
         for income_group in self.configurations['income_groups_colors'].keys():
-            # Fill distribution with color
-            kde = gaussian_kde(self.ac_data[self.ac_data['income_group'] == income_group][column].dropna())
             # Plot the distribution
-            x = np.linspace(0, 5000, 1000)
-            plt.fill_between(x, offset, offset + kde(x), edgecolor='none', alpha=0.5,
-                             color=self.configurations['income_groups_colors'][income_group])
-            offset += kde(x)
+            from scipy.stats import gaussian_kde
+            kde = gaussian_kde(self.ac_data[self.ac_data['income_group'] == income_group][column].dropna())
+            max_kde = kde(self.ac_data[self.ac_data['income_group'] == income_group][column].dropna()).max()
+            if max_kde > norm_kde_max:
+                norm_kde_max = max_kde
+            kdes.append(kde)
+        print("max kde", norm_kde_max)
+        for kde, income_group in zip(kdes, self.configurations['income_groups_colors'].keys()):
+            x = np.linspace(0, x_max, 1000)
+            y = kde(x)
+            plt.plot(x, y/norm_kde_max, label=income_group, c=self.configurations['income_groups_colors'][income_group])
 
-            # self.ac_data[self.ac_data['income_group'] == income_group][column].dropna().plot(kind='kde', 
-            #     label=income_group, color=self.configurations['income_groups_colors'][income_group])
-        # self.ac_data[column].dropna().plot(kind='kde', label='All countries', color='black')
-        # Set x range from 0 to 5000
-        plt.xlim(0, 4000)
-        if not 'diff' in column:
-            plt.ylim(0, 0.003)
+        # Set x range
+        plt.xlim(0, x_max)
+        plt.ylim(0, 5)
 
-        else:
-            plt.ylim(0, 0.01)        
 
 
 class ContourPlot(ExperiencedTPlot):
@@ -183,49 +179,45 @@ class ContourPlot(ExperiencedTPlot):
         gdp_x = np.linspace(gdp_range[0], gdp_range[1], gdp_range[2])
         self.cdd_x, self.gdp_x = np.meshgrid(cdd_x, gdp_x)
 
-    def calculate_contour(self, exposure_function):
+    def calculate_contour(self, exposure_function, multiply_cdd):
         """
         Calculate contour function
         """
-        if self.country == None:
-            self.contour_function = exposure_function(self.cdd_x, self.gdp_x)*self.cdd_x
+        self.contour_function = exposure_function(self.cdd_x, self.gdp_x)
+        if multiply_cdd:
+            self.contour_function *= self.cdd_x
         else:
-            self.gdp_country = self.ac_data[self.ac_data.index==self.country]['GDP'].values[0]
-            self.cdd_country = self.ac_data[self.ac_data.index==self.country]['CDD'].values[0]
-            self.contour_function = exposure_function(self.gdp_country*((1+self.gdp_x/100.)**(self.configurations['analysis_years']['future_year']-self.configurations['analysis_years']['ref_year'])), self.cdd_country*(1+self.cdd_x/100.))*self.cdd_country*(1+self.cdd_x/100.)
-    
-    def plot_contour(self):
+            self.contour_function = 1. - self.contour_function
+  
+    def plot_contour(self, multiply_cdd=True):
         """
         Contour plot of exposure times CDD as a function of GDP per capita and cooling degree days
         """
-        self.level_max = self.configurations['plotting']['experiencedT_max']
-        if self.country:
-            n_levels = self.configurations['plotting']['contour_levels'][self.country]
+        if multiply_cdd:
+            self.level_max = self.configurations['plotting']['cooling_deficit_index_max']
+            label = self.configurations['plotting']['exposure_times_cdd_label']
+            color_map = self.configurations['plotting']['exposure_times_cdd_cmap']
         else:
-            n_levels = self.configurations['plotting']['contour_levels']['absolute']
+            self.level_max = 1.
+            label = 'AC adoption'
+            color_map = self.configurations['plotting']['ac_adoption_cmap']
+        n_levels = self.configurations['plotting']['contour_levels']
         self.levels = np.linspace(0, self.level_max, n_levels)
-        color_map = self.configurations['plotting']['exposure_times_cdd_cmap']
         
         plt.contourf(self.cdd_x, self.gdp_x, self.contour_function, levels=self.levels, cmap=color_map)
-        plt.colorbar(label=self.configurations['plotting']['exposure_times_cdd_label'], ticks=np.linspace(0, self.level_max, 11))
+        plt.colorbar(label=label, ticks=np.linspace(0, self.level_max, 11))
         
-    def add_contour_lines(self, exposure_function):
+    def add_contour_lines(self, multiply_cdd=True):
         """
         Add contour lines
         """
         clines = plt.contour(self.cdd_x, self.gdp_x, self.contour_function, levels=self.levels, colors='k', linewidths=0.3)
-        plt.clabel(clines, self.levels[::2], fmt='%d', fontsize=8, colors='black')
+        if multiply_cdd:
+            format = '%d'
+        else:
+            format = '%.1f'
+        plt.clabel(clines, self.levels[::2], fmt=format, fontsize=8, colors='black')
         plt.clim(0, self.levels[-1])
-
-    def add_const_heat_exposure_lines(self, exposure_function, const_heat_exposure):
-        # Add constant exposure times CDD line
-        # self.const_level = [exposure_function(self.gdp_country*(1.**(self.configurations['analysis_years']['future_year']-self.configurations['analysis_years']['ref_year'])), self.cdd_country)*self.cdd_country]
-        for line in const_heat_exposure.keys():
-            const_level = self.ac_data[self.ac_data.index == line]['exposure_times_cdd']
-            const_line = plt.contour(self.cdd_x, self.gdp_x, self.contour_function, 
-                    levels= const_level, colors=const_heat_exposure[line], linewidths=1.2)
-            # keep label parallel to line
-            plt.clabel(const_line, const_level, fmt=line, fontsize=9, colors=const_heat_exposure[line])
 
     def add_data(self):
         """
@@ -236,67 +228,16 @@ class ContourPlot(ExperiencedTPlot):
             y = self.ac_data[self.ac_data.index == income_group]['GDP']
             plt.scatter(x, y, label=income_group, c=self.configurations['income_groups_colors'][income_group], s=8, marker='o')
 
-
-    def add_control_data(self, color):
-        """
-        Add AC data for control plots
-        """
-        # Print AC data when not null
-        plt.scatter(self.ac_data['CDD'], self.ac_data['GDP'], c=(1.-self.ac_data['AC']) * self.ac_data['CDD'], 
-                    cmap=self.configurations['plotting']['exposure_times_cdd_cmap'], 
-                    vmin=0., vmax=self.level_max,  s=16, edgecolors=color, label='AC data')
-
-    def add_cdd_predictions(self):
-        """
-        Add CDD predictions as horizontal dashed lines
-        """   
-        if not self.country:
-            print('No country selected')
-            return
-        print('group: {0}'.format(self.country))
-        ac_data_sel_country = self.ac_data[self.ac_data.index == self.country]
-        for isc,scenario in enumerate(self.configurations['future_scenarios']):
-            future_cdd_scenario = (((ac_data_sel_country['CDD_{0}_{1}'
-                .format(scenario, self.configurations['analysis_years']['future_year'])]-ac_data_sel_country['CDD'])/ac_data_sel_country['CDD'])*100).values[0]
-            # GDP increase to avoid increased heat exposure for given scenario
-            gdp_increase_const = ac_data_sel_country['gdp_const_{0}'.format(scenario)].values[0]*100.
-            print(scenario)
-            print('future cdd increase: {0}'.format(future_cdd_scenario))
-            print('gdp increase: {0}'.format(gdp_increase_const))
-
-            
-            if future_cdd_scenario > 0:
-                y1, y2 = [0, future_cdd_scenario]
-                x1, x2 = [gdp_increase_const, gdp_increase_const]
-            else:
-                x1, x2 = [0, 0]
-
-            plt.plot([0, gdp_increase_const], [future_cdd_scenario, future_cdd_scenario], '--', 
-                     c=self.configurations['scenario_colors'][isc], linewidth=0.8)
-
-            plt.plot([x1,x2], [0, future_cdd_scenario], '--', 
-                     c=self.configurations['scenario_colors'][isc], linewidth=0.8)
-            # Label line with scenario ssp2_rcp45 in the format RCP 4.5
-            formatted_string = re.sub(r'rcp(\d)(\d)', r'RCP \1.\2', scenario.split('_')[1])
-            plt.annotate(formatted_string, (self.gdp_x[0][0], future_cdd_scenario), 
-                         fontsize=8.5, color=self.configurations['scenario_colors'][isc])
     
-    def add_country_labels(self, countries, colors, control):
+    def add_country_labels(self, countries, colors):
         """
-        Label points with country names in control plot and year in main plot
+        Label points with income group
         """ 
         for txt in countries:
-            if control:
-                color = colors
-                label = txt
-                fontsize=6
-                id = self.ac_data['ISO3']
-            else:
-                color = colors[txt]
-                label = txt
-                fontsize=9
-                id = self.ac_data.index
-
+            color = colors[txt]
+            label = txt
+            fontsize=9
+            id = self.ac_data.index
             country_index = self.ac_data[id == txt].index
 
             plt.annotate(label, (self.ac_data['CDD'][country_index]+50, self.ac_data['GDP'][country_index]*0.9),
@@ -335,8 +276,7 @@ class GDPIncreaseScatter(GDPIncreaseMap):
         Plot scatter plot, color coded by continent
         """
 
-        self.fig, self.ax = plt.subplots()
-        self.ax.set_aspect('equal', adjustable='box')
+        self.fig, self.ax = plt.subplots(figsize=(5, 5))
 
         for income_group in groups:
             x = self.ac_data[self.ac_data['income_group'] == income_group][data[0]]
@@ -351,8 +291,11 @@ class GDPIncreaseScatter(GDPIncreaseMap):
                 self.ax.set_xlim(-2., 10.)
                 self.ax.set_ylim(-2., 10.)
             else:
-                self.ax.set_xlim(0., 4000.)
-                self.ax.set_ylim(0., 4000.)
+                self.ax.set_xlim(-50., 4050.)
+                if not "diff" in data[1]:
+                    self.ax.set_ylim(50., 4050.)
+                else:
+                    self.ax.set_ylim(50., 2050.)
 
             # Plot GDP growth to obtain high income group average exposure*CDD
             if data[2] is not None:
@@ -362,26 +305,6 @@ class GDPIncreaseScatter(GDPIncreaseMap):
                     y2 = y2 * 100
                 self.ax.scatter(x, y2, label=income_group, s=10, marker='o', linewidth=0.5,
                         edgecolors=self.configurations['income_groups_colors'][income_group], facecolors='none')
-
-
-    def confidence_ellipse_median(self, x_val, y_val, ax, n_std=2.4477, facecolor='none'):
-        """
-        Create a plot of the covariance confidence ellipse of *x* and *y*,
-        centered around the median of the data instead of the mean.
-        """
-        from matplotlib.patches import Ellipse
-        median_x = np.median(x_val)
-        median_y = np.median(y_val)
-
-        cov = np.cov(x_val, y_val)
-        eigenvalues, eigenvectors = np.linalg.eig(cov)
-        eigenvalues = np.sqrt(eigenvalues)
-        
-        ellipse = Ellipse(xy=(median_x, median_y),
-                    width=eigenvalues[0]*n_std*2, height=eigenvalues[1]*n_std*2,
-                    angle=np.rad2deg(np.arccos(eigenvectors[0, 0])), alpha=0.3, facecolor=facecolor)
-        
-        ax.add_artist(ellipse)
         
     
 
