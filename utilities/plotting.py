@@ -109,6 +109,8 @@ def plot_gdp_increase_scatter(configurations, gdp_cdd_data, future_scenario):
         gdp_increase_scatter.plot_scatter(['gdp_historical_growth', 'gdp_const_{0}'.format(future_scenario), 
                                     'gdp_const_{0}_custom_exp_cdd'.format(future_scenario)], [income_group])
         gdp_increase_scatter.add_x_y_labels('Mean annual historical GDP growth (%)', 'Mean annual GDP growth to avoid\nincreased heat exposure nunder {0} (%)'.format(gdp_increase_scatter.formatted_scenario))
+        gdp_increase_scatter.label_countries(configurations['label_countries'], ['gdp_historical_growth', 'gdp_const_{0}'.format(future_scenario), 
+                                    'gdp_const_{0}_custom_exp_cdd'.format(future_scenario)])
         gdp_increase_scatter.add_1_to_1_line(['gdp_historical_growth', 'gdp_const_{0}'.format(future_scenario)], min=-2., max=10.)
         gdp_increase_scatter.save_figure()
 
@@ -125,11 +127,6 @@ def plot_cdd_scatter(configurations, gdp_cdd_data, future_scenario):
             add_label = ''
         else:
             add_label = 'difference '
+        gdp_increase_scatter.label_countries(configurations['label_countries'], ['CDD', 'CDD_{0}_2100{1}'.format(future_scenario, appendix)])
         gdp_increase_scatter.add_x_y_labels('CDD in {0} (°C days)'.format(configurations['analysis_years']['ref_year']), 'CDD {0}in 2100\nunder {1} (°C days)'.format(add_label, gdp_increase_scatter.formatted_scenario))
-        for income_group in configurations['income_groups_colors'].keys():
-            # Get values without NaNs
-            gdp_cdd_data = gdp_cdd_data.dropna(subset=['CDD', 'CDD_{0}_2100{1}'.format(future_scenario, appendix)])
-            cdd = gdp_cdd_data['CDD'][gdp_cdd_data['income_group'] == income_group].values
-            cdd_2100 = gdp_cdd_data['CDD_{0}_2100{1}'.format(future_scenario, appendix)][gdp_cdd_data['income_group'] == income_group].values
-            # gdp_increase_scatter.confidence_ellipse_median(cdd, cdd_2100, gdp_increase_scatter.ax, n_std=1.0, facecolor=configurations['income_groups_colors'][income_group])
         gdp_increase_scatter.save_figure()

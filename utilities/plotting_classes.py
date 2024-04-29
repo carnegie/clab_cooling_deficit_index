@@ -284,18 +284,18 @@ class GDPIncreaseScatter(GDPIncreaseMap):
             if 'gdp' in data[0]:
                 x = x * 100
                 y = y * 100
-            self.ax.scatter(x, y, label=income_group, s=10, marker='o',
+            self.ax.scatter(x, y, label=income_group, s=32, marker='o',
                     c=self.configurations['income_groups_colors'][income_group])
             
             if len(groups) == 1:
                 self.ax.set_xlim(-2., 10.)
                 self.ax.set_ylim(-2., 10.)
             else:
-                self.ax.set_xlim(-50., 4050.)
+                self.ax.set_xlim(0., 4000.)
                 if not "diff" in data[1]:
-                    self.ax.set_ylim(50., 4050.)
+                    self.ax.set_ylim(0., 4000.)
                 else:
-                    self.ax.set_ylim(50., 2050.)
+                    self.ax.set_ylim(0., 1750.)
 
             # Plot GDP growth to obtain high income group average exposure*CDD
             if data[2] is not None:
@@ -303,11 +303,10 @@ class GDPIncreaseScatter(GDPIncreaseMap):
                 y2 = self.ac_data[self.ac_data['income_group'] == income_group][data[2]].clip(lower=0)
                 if 'gdp' in data[2]:
                     y2 = y2 * 100
-                self.ax.scatter(x, y2, label=income_group, s=10, marker='o', linewidth=0.5,
+                self.ax.scatter(x, y2, label=income_group, s=32, marker='o', linewidth=0.5,
                         edgecolors=self.configurations['income_groups_colors'][income_group], facecolors='none')
         
     
-
     def add_1_to_1_line(self, data, min=None, max=None):
         """
         Add line where historical and constant GDP growth are equal
@@ -323,3 +322,23 @@ class GDPIncreaseScatter(GDPIncreaseMap):
             max = np.max([np.max(x_all), np.max(y_all)])
         plt.plot([min, max], [min, max], '--', c='grey')
         plt.annotate('1:1 line', (max*0.8, max*0.85), fontsize=12, color='grey', rotation=40)
+
+    
+    def label_countries(self, countries, data):
+        """
+        Label points with income group
+        """ 
+        for txt in countries:
+            if txt == 'China':
+                country_name = "People's Republic of China"
+            else:
+                country_name = txt
+
+            if country_name in self.ac_data['Country'].values:
+                country_data = self.ac_data[self.ac_data['Country'] == country_name]
+                x = country_data[data[0]]
+                y = country_data[data[1]]
+                if 'gdp' in data[0]:
+                    x = x * 100
+                    y = y * 100
+                plt.annotate(txt, (x, y), fontsize=8, color='black', rotation=20)

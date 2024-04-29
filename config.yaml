@@ -32,10 +32,21 @@ future_scenarios:
 
 # Income groups
 income_groups_colors:
-  low: 'fuchsia'
-  lower middle: 'orange'
-  upper middle: 'cyan'
-  high: 'blue'
+  high: '#cfe766'
+  low: '#1c8e66'
+  lower middle: '#5bad66'
+  upper middle: '#95ca66'
+
+# Label countries
+label_countries:
+  - 'India'
+  - 'China'
+  - 'United States'
+  - 'Indonesia'
+  - 'Pakistan'
+  - 'Nigeria'
+  - 'Brazil'
+  - 'Ethiopia'
 
 # Plotting settings
 plotting:
