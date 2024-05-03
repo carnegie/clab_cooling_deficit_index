@@ -7,19 +7,17 @@ def plot_variable_map(configurations, heat_exposure_df, plotting_variable):
     """
     map_plot = ExposurePlot(configurations, heat_exposure_df, '{0}_map'.format(plotting_variable))
     map_plot.create_data_map()
-    try:
-        colormap = configurations['plotting']['{0}_cmap'.format(plotting_variable.split('_')[0].lower())]
-    except KeyError:
-        colormap = configurations['income_groups_colors']
+    var_name = plotting_variable.split('_')[0].lower() if len(plotting_variable.split('_')) == 1 else plotting_variable.split('_')[0].lower()+'_'+plotting_variable.split('_')[-1].lower()
+    colormap = configurations['plotting']['{0}_cmap'.format(var_name)]
     map_plot.plot_map(plotting_variable, colormap=colormap, 
-                      vmin=configurations['plotting'][plotting_variable.split('_')[0].lower()+'_min'],
-                      vmax=configurations['plotting'][plotting_variable.split('_')[0].lower()+'_max'])
+                      vmin=configurations['plotting'][var_name+'_min'],
+                      vmax=configurations['plotting'][var_name+'_max'])
     map_plot.grey_empty_countries(plotting_variable)
     map_plot.remove_axes_ticks()
     map_plot.add_colorbar(label=configurations['plotting'][plotting_variable.split('_')[0].lower()+'_label'], 
                           colormap=colormap,
-                          colorbar_max=configurations['plotting'][plotting_variable.split('_')[0].lower()+'_max'],
-                          colorbar_min=configurations['plotting'][plotting_variable.split('_')[0].lower()+'_min'])    
+                          colorbar_min=configurations['plotting'][var_name+'_min'],
+                                                    colorbar_max=configurations['plotting'][var_name+'_max'])
     map_plot.add_title(plotting_variable, fontsize=12)
     map_plot.save_figure()
 

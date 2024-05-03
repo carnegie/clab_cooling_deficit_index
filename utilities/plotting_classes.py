@@ -98,7 +98,7 @@ class ExposurePlot(ExperiencedTPlot):
         if 'GDP' in column:
             self.plot = self.ac_data_map_geo.plot(column=column, cmap=colormap, vmin=vmin, vmax=vmax, norm=LogNorm())
         else:
-            self.plot = self.ac_data_map_geo.plot(column=column, cmap=colormap, vmin=0, vmax=vmax)
+            self.plot = self.ac_data_map_geo.plot(column=column, cmap=colormap, vmin=vmin, vmax=vmax)
 
         
     def grey_empty_countries(self, column_name):
@@ -125,7 +125,7 @@ class ExposurePlot(ExperiencedTPlot):
 
 
         
-    def add_colorbar(self, label, colormap, colorbar_max, colorbar_min=0):
+    def add_colorbar(self, label, colormap, colorbar_min, colorbar_max):
         """
         Add colorbar
         """
@@ -154,7 +154,7 @@ class ExposurePlot(ExperiencedTPlot):
             if max_kde > norm_kde_max:
                 norm_kde_max = max_kde
             kdes.append(kde)
-        print("max kde", norm_kde_max)
+
         for kde, income_group in zip(kdes, self.configurations['income_groups_colors'].keys()):
             x = np.linspace(0, x_max, 1000)
             y = kde(x)
@@ -284,18 +284,19 @@ class GDPIncreaseScatter(GDPIncreaseMap):
             if 'gdp' in data[0]:
                 x = x * 100
                 y = y * 100
-            self.ax.scatter(x, y, label=income_group, s=32, marker='o',
+                axes_range = [self.configurations['plotting']['gdp_growth_min'], self.configurations['plotting']['gdp_growth_max']]
+            else:
+                min = self.configurations['plotting']['cdd_min']
+                if 'diff' in data[1]:
+                    axes_range = [min, self.configurations['plotting']['cdd_diff_max']]
+                else:
+                    axes_range = [min, self.configurations['plotting']['cdd_max']]
+                
+            self.ax.scatter(x, y, label=income_group, s=42, marker='o',
                     c=self.configurations['income_groups_colors'][income_group])
             
-            if len(groups) == 1:
-                self.ax.set_xlim(-2., 10.)
-                self.ax.set_ylim(-2., 10.)
-            else:
-                self.ax.set_xlim(0., 4000.)
-                if not "diff" in data[1]:
-                    self.ax.set_ylim(0., 4000.)
-                else:
-                    self.ax.set_ylim(0., 1750.)
+            self.ax.set_xlim(axes_range[0], axes_range[1])
+            self.ax.set_ylim(axes_range[0], axes_range[1])
 
             # Plot GDP growth to obtain high income group average exposure*CDD
             if data[2] is not None:
@@ -303,7 +304,7 @@ class GDPIncreaseScatter(GDPIncreaseMap):
                 y2 = self.ac_data[self.ac_data['income_group'] == income_group][data[2]].clip(lower=0)
                 if 'gdp' in data[2]:
                     y2 = y2 * 100
-                self.ax.scatter(x, y2, label=income_group, s=32, marker='o', linewidth=0.5,
+                self.ax.scatter(x, y2, label=income_group, s=42, marker='o', linewidth=1.5,
                         edgecolors=self.configurations['income_groups_colors'][income_group], facecolors='none')
         
     

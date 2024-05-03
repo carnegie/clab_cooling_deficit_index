@@ -32,10 +32,10 @@ future_scenarios:
 
 # Income groups
 income_groups_colors:
-  high: '#cfe766'
-  low: '#1c8e66'
-  lower middle: '#5bad66'
-  upper middle: '#95ca66'
+  high: '#81d34d'
+  upper middle: '#20a486'
+  lower middle: '#2e6e8e'
+  low: '#482878'
 
 # Label countries
 label_countries:
@@ -54,18 +54,20 @@ plotting:
   cooling_deficit_index_max: 5000.
   cdd_min: 0.
   cdd_max: 4000.
-  cdd_diff_max: 2000.
+  cdd_diff_min: -200.
+  cdd_diff_max: 1750.
   gdp_max: 100000.
   gdp_min: 1000.
+  gdp_growth_min: -2.
+  gdp_growth_max: 10.
   contour_levels: 21
-  gdp_growth_min: 0.
-  gdp_growth_max: 5.
   # Labels
   exposure_times_cdd_label: 'Cooling Deficit Index (°C days)'
   cdd_label: 'Cooling Degree Days (°C days)'
   gdp_label: 'GDP per capita (2017 int. $)'
   # Color maps
   cdd_cmap: 'autumn_r'
-  gdp_cmap: 'summer'
+  cdd_diff_cmap: 'gist_heat_r'
+  gdp_cmap: 'viridis'
   exposure_times_cdd_cmap: 'inferno_r'
   ac_adoption_cmap: 'viridis'
