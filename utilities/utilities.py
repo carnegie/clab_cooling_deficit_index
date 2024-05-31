@@ -9,20 +9,20 @@ def saturation(cdd, c):
 def exp_avail(gdp, a, b):
     return (1./(1. + np.exp(a)* np.exp(b*gdp)))
 
-def power_avail(gdp, alpha, k):
-    return (gdp**alpha / (gdp**alpha + k**alpha))
+def power_avail(gdp, beta, gamma):
+    return (gdp**beta / (gdp**beta + gamma**beta))
 
-def exposure_combined_exponential(xdata, cdd_scale, alpha, k):
+def exposure_combined_exponential(xdata, alpha, beta, gamma):
     cdd, gdp = xdata
-    return (np.exp(-cdd_scale * ((cdd/1000.)**alpha * (gdp/100000.)**k)))
+    return (np.exp(-alpha * ((cdd/1e3)**(beta*gdp/1e6) * (gdp/1e6)**gamma)))
 
-def exposure_function(xdata, avail_func, cdd_scale, alpha, k):
+def exposure_function(xdata, avail_func, alpha, beta, gamma):
     """
     This function calculates the exposure of a country to outside temperature
     """
     cdd, gdp = xdata
-    avail = avail_func(gdp, alpha, k)
-    sat = saturation(cdd, cdd_scale)
+    avail = avail_func(gdp, beta, gamma)
+    sat = saturation(cdd, alpha)
     return (1 - avail*sat) 
 
 
@@ -200,13 +200,13 @@ def gdp_from_cdd_exposure(exposure_cdd, cdd, loaded_parameters, av_func_type):
     """
     This function calculates the GDP per capita assuming fixed exposure * cooling degree days
     """
-    cdd_scale, alpha, k = loaded_parameters['cdd_scale'], loaded_parameters['alpha'], loaded_parameters['k']
+    alpha, beta, gamma = loaded_parameters['alpha'], loaded_parameters['beta'], loaded_parameters['gamma']
     if av_func_type == 'power_law':
-        gdp_const = ((k**alpha) * (cdd-exposure_cdd)/ (saturation(cdd,cdd_scale)*cdd - cdd + exposure_cdd))**(1./alpha)
+        gdp_const = ((gamma**beta) * (cdd-exposure_cdd)/ (saturation(cdd,alpha)*cdd - cdd + exposure_cdd))**(1./beta)
     elif av_func_type == 'exponential':
-        gdp_const = np.log((1./np.exp(alpha))*((saturation(cdd,cdd_scale)/(1 - exposure_cdd/cdd)) - 1))/k
+        gdp_const = np.log((1./np.exp(beta))*((saturation(cdd,alpha)/(1 - exposure_cdd/cdd)) - 1))/gamma
     elif av_func_type == 'combined_exponential':
-        gdp_const = ( (-1./(cdd_scale*(cdd/1000.)**alpha)) * np.log(exposure_cdd/cdd) )**(1./k) * 100000.
+        gdp_const = ( (-1./(alpha*(cdd/1e3)**beta)) * np.log(exposure_cdd/cdd) )**(1./gamma) * 1e6
     else:
         logging.error("Invalid availability function type")
     return gdp_const

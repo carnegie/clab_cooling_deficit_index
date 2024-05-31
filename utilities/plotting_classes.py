@@ -15,7 +15,6 @@ class ExperiencedTPlot:
         self.name_tag = name_tag
         self.country = country
 
-        matplotlib.rcParams['font.family'] = 'Helvetica'
         plt.figure()
 
     def add_x_y_labels(self, xlabel, ylabel):

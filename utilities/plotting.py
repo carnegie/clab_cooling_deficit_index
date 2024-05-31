@@ -71,9 +71,9 @@ def plot_exposure_contour(configurations, exposure_function, ac_data, x_y_ranges
     data_color = configurations['income_groups_colors']
     contour_plot.add_data()
     contour_plot.set_y_log()
-    contour_plot.add_country_labels(data_points, data_color)
-    contour_plot.add_x_y_labels(configurations['plotting']['cdd_label'], configurations['plotting']['gdp_label'])
-    contour_plot.save_figure()
+    # contour_plot.add_country_labels(data_points, data_color)
+    # contour_plot.add_x_y_labels(configurations['plotting']['cdd_label'], configurations['plotting']['gdp_label'])
+    # contour_plot.save_figure()
 
 def plot_gdp_increase_map(configurations, gdp_cdd_data, future_scenario):
     """
