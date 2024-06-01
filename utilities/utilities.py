@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import logging
 import country_converter as coco
+from scipy.optimize import fsolve
 
 def saturation(cdd, c):
     return (1. - np.exp(-c*cdd))
@@ -201,15 +202,22 @@ def gdp_from_cdd_exposure(exposure_cdd, cdd, loaded_parameters, av_func_type):
     This function calculates the GDP per capita assuming fixed exposure * cooling degree days
     """
     alpha, beta, gamma = loaded_parameters['alpha'], loaded_parameters['beta'], loaded_parameters['gamma']
-    if av_func_type == 'power_law':
-        gdp_const = ((gamma**beta) * (cdd-exposure_cdd)/ (saturation(cdd,alpha)*cdd - cdd + exposure_cdd))**(1./beta)
-    elif av_func_type == 'exponential':
-        gdp_const = np.log((1./np.exp(beta))*((saturation(cdd,alpha)/(1 - exposure_cdd/cdd)) - 1))/gamma
-    elif av_func_type == 'combined_exponential':
-        gdp_const = ( (-1./(alpha*(cdd/1e3)**beta)) * np.log(exposure_cdd/cdd) )**(1./gamma) * 1e6
-    else:
-        logging.error("Invalid availability function type")
-    return gdp_const
+
+    # Define the equation to be solved for a single pair of f and CDD
+    def equation(GDP, f, CDD):
+        return np.exp(-alpha * ((CDD / 1e3) ** (beta * GDP / 1e6) * (GDP / 1e6) ** gamma))*CDD - f
+
+    # Provide an initial guess for GDP
+    initial_guess = 1e3
+
+    # SOlve the equation for each pair of f and CDD
+    GDP_solutions = np.zeros(len(exposure_cdd))
+    for i in range(len(exposure_cdd)):
+        GDP_solutions[i] = fsolve(equation, initial_guess, args=(exposure_cdd[i], cdd[i]))[0]
+
+    print("The numerical solutions for GDP are:", GDP_solutions)
+    GDP_solutions = pd.Series(GDP_solutions, index=exposure_cdd.index)
+    return GDP_solutions
     
 
 
