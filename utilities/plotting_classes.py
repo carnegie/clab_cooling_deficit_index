@@ -184,7 +184,7 @@ class ContourPlot(ExperiencedTPlot):
         """
         self.contour_function = exposure_function(self.cdd_x, self.gdp_x)
         if multiply_cdd:
-            self.contour_function *= 1#self.cdd_x
+            self.contour_function *= self.cdd_x
         else:
             self.contour_function = 1. - self.contour_function
   

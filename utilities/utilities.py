@@ -197,7 +197,7 @@ def calculate_average_gdp_growth(gdp_year_n, gdp_year_0, n_years):
     return (gdp_year_n / gdp_year_0) ** (1./n_years) - 1
 
 
-def gdp_from_cdd_exposure(exposure_cdd, cdd, loaded_parameters, av_func_type):
+def gdp_from_cdd_exposure(exposure_cdd, cdd, loaded_parameters):
     """
     This function calculates the GDP per capita assuming fixed exposure * cooling degree days
     """
@@ -210,7 +210,11 @@ def gdp_from_cdd_exposure(exposure_cdd, cdd, loaded_parameters, av_func_type):
     # Provide an initial guess for GDP
     initial_guess = 1e3
 
-    # SOlve the equation for each pair of f and CDD
+    # If a single value is passed, calculate the GDP for that value for each country
+    if np.isscalar(exposure_cdd):
+        exposure_cdd = pd.Series([exposure_cdd]*len(cdd))
+
+    # Solve the equation for each pair of f and CDD
     GDP_solutions = np.zeros(len(exposure_cdd))
     for i in range(len(exposure_cdd)):
         GDP_solutions[i] = fsolve(equation, initial_guess, args=(exposure_cdd[i], cdd[i]))[0]
@@ -233,7 +237,7 @@ def calculate_gdp_const(df, configurations, parameters, exp_cdd=None):
     for scenario in configurations['future_scenarios']:
         gdp_const = gdp_from_cdd_exposure(exp_cdd, 
                     df['CDD_{0}_{1}'.format(scenario, configurations['analysis_years']['future_year'])], 
-                    parameters, configurations['availability_function'])
+                    parameters)
         # Replace inf with NaN
         logging.info("Infinite GDP calculated for {0}, possibly 0 CDD".format(gdp_const[gdp_const == np.inf].index))
         gdp_const[gdp_const == np.inf] = np.nan
