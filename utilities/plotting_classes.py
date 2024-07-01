@@ -4,6 +4,7 @@ import matplotlib
 import geopandas as gpd
 import country_converter as coco
 import numpy as np
+import pandas as pd
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Normalize, LogNorm
 
@@ -106,9 +107,15 @@ class ExposurePlot(ExperiencedTPlot):
         """
         # Plot countries with no data in grey
         empty_countries = self.ac_data_map_geo[self.ac_data_map_geo[column_name].isnull()]
-        if empty_countries.shape[0] > 0:
-            empty_countries = empty_countries[empty_countries['geometry'].notnull()]
-            empty_countries.plot(ax=plt.gca(), color='lightgrey')
+        # Also grey countries if future CDD is less than today
+        if 'CDD_' in column_name and 'diff' in column_name:
+            cdd_decrease_countries = self.ac_data_map_geo[self.ac_data_map_geo[column_name] < 0.]
+        else:
+            cdd_decrease_countries = pd.DataFrame()
+        grey_countries = pd.concat([empty_countries, cdd_decrease_countries])
+        if grey_countries.shape[0] > 0:
+            grey_countries = grey_countries[grey_countries['geometry'].notnull()]
+            grey_countries.plot(ax=plt.gca(), color='lightgrey')
         plt.gca().set_aspect('equal', adjustable='box')
 
     def color_countries(self, color, group_label):
@@ -287,15 +294,17 @@ class GDPIncreaseScatter(GDPIncreaseMap):
             else:
                 min = self.configurations['plotting']['cdd_min']
                 if 'diff' in data[1]:
-                    axes_range = [min, self.configurations['plotting']['cdd_diff_max']]
-                else:
-                    axes_range = [min, self.configurations['plotting']['cdd_max']]
+                    axes_range_y = [min, self.configurations['plotting']['cdd_diff_max']]
+                axes_range = [min, self.configurations['plotting']['cdd_max']]
                 
             self.ax.scatter(x, y, label=income_group, s=42, marker='o',
                     c=self.configurations['income_groups_colors'][income_group])
             
             self.ax.set_xlim(axes_range[0], axes_range[1])
-            self.ax.set_ylim(axes_range[0], axes_range[1])
+            if 'diff' in data[1]:
+                self.ax.set_ylim(axes_range_y[0], axes_range_y[1])
+            else:
+                self.ax.set_ylim(axes_range[0], axes_range[1])
 
             # Plot GDP growth to obtain high income group average exposure*CDD
             if data[2] is not None:

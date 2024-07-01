@@ -219,7 +219,6 @@ def gdp_from_cdd_exposure(exposure_cdd, cdd, loaded_parameters):
     for i in range(len(exposure_cdd)):
         GDP_solutions[i] = fsolve(equation, initial_guess, args=(exposure_cdd[i], cdd[i]))[0]
 
-    print("The numerical solutions for GDP are:", GDP_solutions)
     GDP_solutions = pd.Series(GDP_solutions, index=exposure_cdd.index)
     return GDP_solutions
     
