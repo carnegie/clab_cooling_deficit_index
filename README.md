@@ -20,6 +20,6 @@ Then activate the environment by running
 
 
 ## Running main script
-The main script for creating all plots is the interactive jupyter notebook ```experienced_cdd_predictions.ipynb```.
+The main script for creating all plots is the interactive jupyter notebook ```cooling_deficit_index.ipynb```.
 
-The underlying function describing air conditioning adoption depending on cooling degree days and per capita GDP is derived in ```derive_ac_adoption_function.ipynb``` (it is not necessary to this to be able to run the main script but fit parameters used in the main script are obtained with this script).
+The underlying function describing air conditioning adoption depending on cooling degree days and per capita GDP is derived in ```derive_ac_adoption_function.ipynb``` (it is not necessary to run this before running the main script but fit parameters used in the main script are obtained with this script).
