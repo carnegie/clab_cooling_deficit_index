@@ -2,7 +2,7 @@
 
 ## Analysis of economic development and increasing temperatures
 
-The data required for the analysis consists of historical data and SSP projections of GDP and historical data and RCP projections of the temperature related variables cooling degree days (CDD) and Heat Index (HI).
+The data required for the analysis consists of historical GDP data, and historical data and RCP projections of cooling degree days (CDD).
 
 The data used in this analysis was collected from the following sources:
 
