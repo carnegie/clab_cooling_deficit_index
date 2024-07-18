@@ -1,0 +1,22 @@
+# Population data from https://ourworldindata.org/population-growth#explore-data-on-population-growth
+,Country,Income group,Population 2019
+203,United States,High income,337790068
+97,Japan,High income,126699422
+49,Germany,High income,83559185
+67,United Kingdom,High income,67110958
+63,France,High income,65729460
+60,Ethiopia,Low income,115737385
+38,"Congo, Dem. Rep.",Low income,92947450
+167,Sudan,Low income,45548178
+200,Uganda,Low income,42999636
+1,Afghanistan,Low income,37856126
+88,India,Lower middle income,1389030303
+149,Pakistan,Lower middle income,230800909
+141,Nigeria,Lower middle income,209485636
+17,Bangladesh,Lower middle income,164913060
+152,Philippines,Lower middle income,110804685
+35,China,Upper middle income,1423520354
+86,Indonesia,Upper middle income,272489379
+26,Brazil,Upper middle income,207455459
+164,Russian Federation,Upper middle income,146533063
+124,Mexico,Upper middle income,125762977

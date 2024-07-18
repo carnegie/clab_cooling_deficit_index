@@ -21,14 +21,18 @@ def plot_variable_map(configurations, heat_exposure_df, plotting_variable):
     map_plot.add_title(plotting_variable, fontsize=12)
     map_plot.save_figure()
 
-def plot_income_groups(configurations, heat_exposure_df):
+def plot_income_groups(configurations, heat_exposure_df, col=None):
     """
     Highlight countries in each income group
     """
     for income_gr in configurations['income_groups_colors'].keys():
-        map_plot_countries = ExposurePlot(configurations, heat_exposure_df, '{0}_map'.format(income_gr))
+        map_plot_countries = ExposurePlot(configurations, heat_exposure_df, '{0}_{1}map'.format(income_gr, "_"+col if col else ""))
         map_plot_countries.create_data_map()
-        map_plot_countries.color_countries(configurations['income_groups_colors'][income_gr], income_gr)
+        color_min = 0
+        color_max = 5
+        map_plot_countries.color_countries(configurations['income_groups_colors'][income_gr], income_gr, col, cmin=color_min, cmax=color_max)
+        if col:
+            map_plot_countries.add_colorbar(label=col, colormap="cmap_{0}_income".format(income_gr), colorbar_min=color_min, colorbar_max=color_max)
         map_plot_countries.remove_axes_ticks()
         map_plot_countries.save_figure()
 
@@ -116,15 +120,12 @@ def plot_cdd_scatter(configurations, gdp_cdd_data, future_scenario):
     """
     Plot difference in exposure times CDD as a function of GDP per capita
     """
-    for appendix in ['', '_diff']:
-        gdp_increase_scatter = GDPIncreaseScatter(configurations, gdp_cdd_data, 'cdd_scatter_{0}{1}'.format(future_scenario, appendix), future_scenario)
-        gdp_increase_scatter.plot_scatter(['CDD', 'CDD_{0}_2100{1}'.format(future_scenario, appendix), None],
+    gdp_cdd_data = gdp_cdd_data.dropna(subset=['CDD', 'CDD_{0}_2100_diff'.format(future_scenario), 'GDP'])
+    for income_group in configurations['income_groups_colors'].keys():
+        gdp_increase_scatter = GDPIncreaseScatter(configurations, gdp_cdd_data[gdp_cdd_data['income_group'] == income_group], 
+                                                  'cdd_scatter_{0}_{1}'.format(future_scenario, income_group), future_scenario)
+        gdp_increase_scatter.plot_scatter(['CDD', 'CDD_{0}_2100_diff'.format(future_scenario), None],
                             configurations['income_groups_colors'].keys())
-        if appendix == '':
-            gdp_increase_scatter.add_1_to_1_line(['CDD', 'CDD_{0}_2100'.format(future_scenario)])
-            add_label = ''
-        else:
-            add_label = 'difference '
-        gdp_increase_scatter.label_countries(configurations['label_countries'], ['CDD', 'CDD_{0}_2100{1}'.format(future_scenario, appendix)])
-        gdp_increase_scatter.add_x_y_labels('CDD in {0} (°C days)'.format(configurations['analysis_years']['ref_year']), 'CDD {0}in 2100\nunder {1} (°C days)'.format(add_label, gdp_increase_scatter.formatted_scenario))
+        gdp_increase_scatter.label_countries(configurations['label_countries'], ['CDD', 'CDD_{0}_2100_diff'.format(future_scenario)])
+        gdp_increase_scatter.add_x_y_labels('CDD in {0} (°C days)'.format(configurations['analysis_years']['ref_year']), 'CDD diff in 2100\nunder {0} (°C days)'.format(gdp_increase_scatter.formatted_scenario))
         gdp_increase_scatter.save_figure()

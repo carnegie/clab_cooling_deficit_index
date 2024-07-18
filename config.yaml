@@ -37,16 +37,24 @@ income_groups_colors:
   lower middle: '#2e6e8e'
   low: '#482878'
 
-# Label countries
+# Label the most populous countries in each income group
 label_countries:
-  - 'India'
-  - 'China'
+# High income
   - 'United States'
+  - 'Japan'
+  - 'Germany'
+# Upper middle income
+  - 'China'
   - 'Indonesia'
-  - 'Pakistan'
-  - 'Nigeria'
   - 'Brazil'
+# Lower middle income  
+  - 'India'  
+  - 'Pakistan'
+  - 'Nigeria' 
+# Low income
   - 'Ethiopia'
+  - 'Democratic Republic of the Congo'
+  - 'Sudan'
 
 # Plotting settings
 plotting:

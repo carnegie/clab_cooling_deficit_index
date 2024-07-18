@@ -31,27 +31,28 @@ def read_ac_data(infile, year=None, skip=0):
     """
     Read the air conditioning data from the given file
     """
-    # Add AC column to merged_data
+    # Read AC data
     ac_data = pd.read_csv(infile, skiprows=skip)
-    # Name first column ISO3 and second column AC
+    # Format the data
     if year is not None:
-        ac_data = format_eia_data(ac_data, year)
+        ac_data = format_oneyear_data(ac_data, year)
     else:
         ac_data = format_gdl_data(ac_data)
     # Rename country names to ISO3
-    ac_data["ISO3"] = coco.convert(names=ac_data["country"].tolist(), to='ISO3')
-    ac_data["country"] = coco.convert(names=ac_data["ISO3"].tolist(), to='name_short')
+    ac_data["ISO3"] = coco.convert(names=ac_data["Country"].tolist(), to='ISO3')
+    # Make sure all names are the same
+    ac_data["Country"] = coco.convert(names=ac_data["ISO3"].tolist(), to='name_short')
     # AC Given in percent
     ac_data["AC"] /= 100.
     # Keep 4 decimal points precision
     ac_data["AC"] = ac_data["AC"].round(4)
     return ac_data
 
-def format_eia_data(ac_data, year):
+def format_oneyear_data(ac_data, year):
     """
-    Format the EIA data to match the format of the other data
+    Format the EIA and OECD data by adding the year column
     """
-    ac_data = ac_data.rename(columns={"Unnamed: 0": "country", "Share of households with AC": "AC"})
+    ac_data = ac_data.rename(columns={"Unnamed: 0": "Country", "Share of households with AC": "AC", "country": "Country"})
     # Add year column
     ac_data["Year"] = year
     return ac_data
@@ -65,7 +66,7 @@ def format_gdl_data(ac_data):
     # Remove empty rows
     ac_data = ac_data.dropna()
     # Rename column airco to AC
-    ac_data = ac_data.rename(columns={"airco": "AC", "year": "Year"})
+    ac_data = ac_data.rename(columns={"airco": "AC", "year": "Year", "country": "Country"})
     # Year column as integer
     ac_data["Year"] = ac_data["Year"].astype(int)
     return ac_data
@@ -90,9 +91,9 @@ def read_cdd_data(cdd_data_path):
     """
     cdd_data = pd.read_csv(cdd_data_path)
     # Drop unit column
-    cdd_data = cdd_data.drop(columns=['Unit'])
+    cdd_data = cdd_data.drop(columns=['Unit', 'Territory'])
     # Rename columns
-    cdd_data = cdd_data.rename(columns={'Country': 'ISO3', 'Territory': 'Country', 'CDD18dailybypop': 'CDD', 'Date': 'Year'})
+    cdd_data = cdd_data.rename(columns={'Country': 'ISO3', 'CDD18dailybypop': 'CDD', 'Date': 'Year'})
     # Round CDD to 5 decimal places
     cdd_data['CDD'] = cdd_data['CDD'].round(5)
 

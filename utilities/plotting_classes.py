@@ -1,12 +1,13 @@
 import os
-import matplotlib.pyplot as plt
-import matplotlib
 import geopandas as gpd
 import country_converter as coco
 import numpy as np
 import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Normalize, LogNorm
+from matplotlib.colors import LinearSegmentedColormap
 
 
 class ExperiencedTPlot:
@@ -49,7 +50,7 @@ class ExperiencedTPlot:
         """
         if not os.path.exists('Figures/paper'):
             os.makedirs('Figures/paper')
-        plt.savefig('Figures/paper/{0}.eps'.format(self.name_tag), dpi=400, bbox_inches='tight')
+        plt.savefig('Figures/paper/{0}.pdf'.format(self.name_tag), dpi=400, bbox_inches='tight')
         plt.savefig('Figures/paper/{0}.png'.format(self.name_tag), dpi=400, bbox_inches='tight')
 
 
@@ -76,9 +77,9 @@ class ExposurePlot(ExperiencedTPlot):
         """
         Create exposure map
         """
-        # Load world geometries
+        # Get the path to the naturalearth countries shapefile
         world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
-        # Copy your data
+        # Copy data
         ac_data_map = self.ac_data.copy()
         # Convert ISO3 codes in your data to match the world dataframe
         cc = coco.CountryConverter()
@@ -118,17 +119,21 @@ class ExposurePlot(ExperiencedTPlot):
             grey_countries.plot(ax=plt.gca(), color='lightgrey')
         plt.gca().set_aspect('equal', adjustable='box')
 
-    def color_countries(self, color, group_label):
+    def color_countries(self, color, group_label, col=None, cmin=None, cmax=None):
         """
         Color countries that have data
         """
         self.ac_data_map_geo.plot(ax=plt.gca(), edgecolor='grey', color='white')
         income_group_countries = self.ac_data_map_geo[self.ac_data_map_geo['income_group'] == group_label]
-        income_group_countries.plot(ax=plt.gca(), color=color)
+        if not col:
+            income_group_countries.plot(ax=plt.gca(), color=color)
+        else:
+            custom_cmap = LinearSegmentedColormap.from_list("cmap_{0}_income".format(group_label), ["white", color])
+            plt.register_cmap(cmap=custom_cmap)
+            income_group_countries.plot(ax=plt.gca(), column=col, cmap=custom_cmap, vmin=cmin, vmax=cmax)
         # Remove black frame around plot
         for spine in plt.gca().spines.values():
             spine.set_visible(False)
-
 
         
     def add_colorbar(self, label, colormap, colorbar_min, colorbar_max):
@@ -144,31 +149,6 @@ class ExposurePlot(ExperiencedTPlot):
             mappable._A = []  # This line is necessary for ScalarMappable to work with colorbar
         plt.colorbar(mappable, label=label, shrink=0.45)
 
-    def plot_histogram(self, column, x_max):
-        """
-        Plot kernel density estimate of CDD data
-        """
-        # Draw a probability density function for each income group and for all countries bound in the range of the data
-        # Normalize the data such that the maximum value is 1
-        norm_kde_max = 0
-        kdes = []
-        for income_group in self.configurations['income_groups_colors'].keys():
-            # Plot the distribution
-            from scipy.stats import gaussian_kde
-            kde = gaussian_kde(self.ac_data[self.ac_data['income_group'] == income_group][column].dropna())
-            max_kde = kde(self.ac_data[self.ac_data['income_group'] == income_group][column].dropna()).max()
-            if max_kde > norm_kde_max:
-                norm_kde_max = max_kde
-            kdes.append(kde)
-
-        for kde, income_group in zip(kdes, self.configurations['income_groups_colors'].keys()):
-            x = np.linspace(0, x_max, 1000)
-            y = kde(x)
-            plt.plot(x, y/norm_kde_max, label=income_group, c=self.configurations['income_groups_colors'][income_group])
-
-        # Set x range
-        plt.xlim(0, x_max)
-        plt.ylim(0, 5)
 
 
 
@@ -287,6 +267,8 @@ class GDPIncreaseScatter(GDPIncreaseMap):
         for income_group in groups:
             x = self.ac_data[self.ac_data['income_group'] == income_group][data[0]]
             y = self.ac_data[self.ac_data['income_group'] == income_group][data[1]]
+            income_color = self.configurations['income_groups_colors'][income_group] 
+
             if 'gdp' in data[0]:
                 x = x * 100
                 y = y * 100
@@ -296,9 +278,11 @@ class GDPIncreaseScatter(GDPIncreaseMap):
                 if 'diff' in data[1]:
                     axes_range_y = [min, self.configurations['plotting']['cdd_diff_max']]
                 axes_range = [min, self.configurations['plotting']['cdd_max']]
+                custom_cmap = LinearSegmentedColormap.from_list("custom_cmap", ["white", income_color])
+                sns.kdeplot(x=x, y=y, cmap=custom_cmap, fill=True, bw_adjust=.9, alpha=0.75)
                 
             self.ax.scatter(x, y, label=income_group, s=42, marker='o',
-                    c=self.configurations['income_groups_colors'][income_group])
+                    c=income_color)
             
             self.ax.set_xlim(axes_range[0], axes_range[1])
             if 'diff' in data[1]:
@@ -313,8 +297,8 @@ class GDPIncreaseScatter(GDPIncreaseMap):
                 if 'gdp' in data[2]:
                     y2 = y2 * 100
                 self.ax.scatter(x, y2, label=income_group, s=42, marker='o', linewidth=1.5,
-                        edgecolors=self.configurations['income_groups_colors'][income_group], facecolors='none')
-        
+                        edgecolors=income_color, facecolors='none')
+
     
     def add_1_to_1_line(self, data, min=None, max=None):
         """
