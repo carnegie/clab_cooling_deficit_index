@@ -2,18 +2,18 @@
 logging_level: 'INFO'
 
 # Files
-cdd_historical_file: 'data_experiencedT/historical/IEA-CMCC-WeatherForEnergy-CDD18dailybypop-from-2000-to-2020.csv'
-gdp_historical_file: 'data_experiencedT/historical/API_NY.GDP.PCAP.PP.KD_DS2_en_csv_v2_5873868.csv'
-cdd_projections_file: 'data_experiencedT/projections/ISO_CDD_GDP18_agg_data.csv'
-gdp_projections_file: 'data_experiencedT/projections/gdp_edu_projections.csv'
+cdd_historical_file: 'data/historical/IEA-CMCC-WeatherForEnergy-CDD18dailybypop-from-2000-to-2020.csv'
+gdp_historical_file: 'data/historical/API_NY.GDP.PCAP.PP.KD_DS2_en_csv_v2_5873868.csv'
+cdd_projections_file: 'data/projections/ISO_CDD_GDP18_agg_data.csv'
+gdp_projections_file: 'data/projections/gdp_edu_projections.csv'
 
-ac_historical_file_iea: 'data_experiencedT/exposure_function_derivation/percentage-of-households-equiped-with-ac-in-selected-countries-2018.csv'
-ac_historical_file_gdl: 'data_experiencedT/exposure_function_derivation/aircon_gdl.csv'
-ac_historical_file_oecd: 'data_experiencedT/exposure_function_derivation/ac_oecd_epic.csv'
+ac_historical_file_iea: 'data/AC_adoption/percentage-of-households-equiped-with-ac-in-selected-countries-2018.csv'
+ac_historical_file_gdl: 'data/AC_adoption/aircon_gdl.csv'
+ac_historical_file_oecd: 'data/AC_adoption/ac_oecd_epic.csv'
 
-world_bank_income_groups_file: 'data_experiencedT/CLASS.xlsx'
+world_bank_income_groups_file: 'data/countries/CLASS.xlsx'
 
-output_path: 'data_experiencedT/cooling_deficit_index_calculations.csv'
+output_path: 'data/cooling_deficit_index_calculations.csv'
 
 # Availability function, either 'exponential' or 'combined_exponential'
 availability_function: 'combined_exponential'

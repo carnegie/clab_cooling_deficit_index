@@ -43,6 +43,8 @@ def read_ac_data(infile, year=None, skip=0):
     ac_data["country"] = coco.convert(names=ac_data["ISO3"].tolist(), to='name_short')
     # AC Given in percent
     ac_data["AC"] /= 100.
+    # Keep 4 decimal points precision
+    ac_data["AC"] = ac_data["AC"].round(4)
     return ac_data
 
 def format_eia_data(ac_data, year):
