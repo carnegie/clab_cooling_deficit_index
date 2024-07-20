@@ -279,7 +279,7 @@ class GDPIncreaseScatter(GDPIncreaseMap):
                     axes_range_y = [min, self.configurations['plotting']['cdd_diff_max']]
                 axes_range = [min, self.configurations['plotting']['cdd_max']]
                 custom_cmap = LinearSegmentedColormap.from_list("custom_cmap", ["white", income_color])
-                sns.kdeplot(x=x, y=y, cmap=custom_cmap, fill=True, bw_adjust=.9, alpha=0.75)
+                sns.kdeplot(x=x, y=y, cmap=custom_cmap, fill=True, bw_adjust=1.2, alpha=0.75)
                 
             self.ax.scatter(x, y, label=income_group, s=42, marker='o',
                     c=income_color)
