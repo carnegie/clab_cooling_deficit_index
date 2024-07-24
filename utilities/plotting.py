@@ -26,7 +26,7 @@ def plot_income_groups(configurations, heat_exposure_df, col=None):
     Highlight countries in each income group
     """
     for income_gr in configurations['income_groups_colors'].keys():
-        map_plot_countries = ExposurePlot(configurations, heat_exposure_df, '{0}_{1}map'.format(income_gr, "_"+col if col else ""))
+        map_plot_countries = ExposurePlot(configurations, heat_exposure_df, '{0}{1}_map'.format(col+"_" if col else "", income_gr.replace(" ","_")))
         map_plot_countries.create_data_map()
         color_min = 0
         color_max = 5
@@ -61,7 +61,7 @@ def plot_gdp_increase_scatter(configurations, gdp_cdd_data, future_scenario):
     """
     for income_group in configurations['income_groups_colors'].keys():
         gdp_increase_scatter = ScatterPlot(configurations, gdp_cdd_data[gdp_cdd_data['income_group'] == income_group],
-                            'gdp_increase_scatter_{0}_{1}'.format(future_scenario, income_group), future_scenario)
+                            'gdp_growth_scatter_{0}_{1}'.format(future_scenario, income_group.replace(" ","_")), future_scenario)
         gdp_increase_scatter.plot_scatter(['gdp_historical_growth', 'gdp_const_{0}'.format(future_scenario), 
                                     'gdp_const_{0}_custom_exp_cdd'.format(future_scenario)], [income_group])
         gdp_increase_scatter.add_x_y_labels('Mean annual historical GDP growth (%)', 'Mean annual GDP growth to avoid\nincreased heat exposure nunder {0} (%)'.format(gdp_increase_scatter.formatted_scenario))
@@ -78,7 +78,7 @@ def plot_cdd_scatter(configurations, gdp_cdd_data, future_scenario):
     gdp_cdd_data = gdp_cdd_data.dropna(subset=['CDD', 'CDD_{0}_2100_diff'.format(future_scenario), 'GDP'])
     for income_group in configurations['income_groups_colors'].keys():
         cdd_scatter = ScatterPlot(configurations, gdp_cdd_data[gdp_cdd_data['income_group'] == income_group], 
-                                                  'cdd_scatter_{0}_{1}'.format(future_scenario, income_group), future_scenario)
+                                                  'cdd_scatter_{0}_{1}'.format(future_scenario, income_group.replace(" ","_")), future_scenario)
         cdd_scatter.plot_scatter(['CDD', 'CDD_{0}_2100_diff'.format(future_scenario), None],
                             configurations['income_groups_colors'].keys())
         cdd_scatter.label_countries(configurations['label_countries'], ['CDD', 'CDD_{0}_2100_diff'.format(future_scenario)])

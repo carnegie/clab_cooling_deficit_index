@@ -63,8 +63,7 @@ class BasicPlot:
         """
         if not os.path.exists('Figures/paper'):
             os.makedirs('Figures/paper')
-        plt.savefig('Figures/paper/{0}.pdf'.format(self.name_tag), dpi=400, bbox_inches='tight')
-        plt.savefig('Figures/paper/{0}.png'.format(self.name_tag), dpi=400, bbox_inches='tight')
+        plt.savefig('Figures/paper/{0}.pdf'.format(self.name_tag), dpi=500, bbox_inches='tight')
 
     def show_close_figure(self):
         """
