@@ -14,9 +14,15 @@ The environment can be set up using conda. To create the environment, run
 
 ```conda env create -f config/env.yaml```
 
-Then activate the environment by running
+Then activate the environment with
 
 ```conda activate CDI_env```
+
+and run 
+
+```jupyter notebook```
+
+Alternatively, you can run the script in your preferred IDE and select ```CDI_env``` as kernel. 
 
 
 ## Running main script
