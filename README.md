@@ -16,7 +16,7 @@ The environment can be set up using conda. To create the environment, run
 
 Then activate the environment by running
 
-```conda activate CDI_env```.
+```conda activate CDI_env```
 
 
 ## Running main script
@@ -35,4 +35,4 @@ The underlying function describing air conditioning adoption depending on coolin
 Although it's not necessary to run this notebook before running the main script, the fit parameters used in the main script are obtained from it.
 
 ## License
-This project is licensed under the MIT License. See the LICENSE file for details.
+This project is licensed under the MIT License. See the [LICENSE](https://github.com/carnegie/clab_cooling_deficit_index/blob/main/LICENSE) file for details.
