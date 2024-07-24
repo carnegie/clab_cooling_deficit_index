@@ -10,7 +10,7 @@ from matplotlib.colors import Normalize, LogNorm
 from matplotlib.colors import LinearSegmentedColormap
 
 
-class ExperiencedTPlot:
+class BasicPlot:
     def __init__(self, configurations, ac_data, name_tag, country=None):
         self.configurations = configurations
         self.ac_data = ac_data
@@ -43,16 +43,6 @@ class ExperiencedTPlot:
         handles, labels = plt.gca().get_legend_handles_labels()
         by_label = dict(zip(labels, handles))
         plt.legend(by_label.values(), by_label.keys(), fontsize=8, loc='upper left', ncol=columns)
-    
-    def save_figure(self):
-        """
-        Save figure
-        """
-        if not os.path.exists('Figures/paper'):
-            os.makedirs('Figures/paper')
-        plt.savefig('Figures/paper/{0}.pdf'.format(self.name_tag), dpi=400, bbox_inches='tight')
-        plt.savefig('Figures/paper/{0}.png'.format(self.name_tag), dpi=400, bbox_inches='tight')
-
 
     def set_y_log(self):
         """
@@ -66,8 +56,25 @@ class ExperiencedTPlot:
         """
         plt.xticks([])
         plt.yticks([])
+    
+    def save_figure(self):
+        """
+        Save figure
+        """
+        if not os.path.exists('Figures/paper'):
+            os.makedirs('Figures/paper')
+        plt.savefig('Figures/paper/{0}.pdf'.format(self.name_tag), dpi=400, bbox_inches='tight')
+        plt.savefig('Figures/paper/{0}.png'.format(self.name_tag), dpi=400, bbox_inches='tight')
 
-class ExposurePlot(ExperiencedTPlot):
+    def show_close_figure(self):
+        """
+        Close figure
+        """
+        plt.show()
+        plt.close()
+
+
+class ExposurePlot(BasicPlot):
     def __init__(self, configurations, ac_data, name_tag, scenario=None, country=None):
         # Call parent class constructor
         super().__init__(configurations, ac_data, name_tag, country=country)
@@ -129,7 +136,11 @@ class ExposurePlot(ExperiencedTPlot):
             income_group_countries.plot(ax=plt.gca(), color=color)
         else:
             custom_cmap = LinearSegmentedColormap.from_list("cmap_{0}_income".format(group_label), ["white", color])
-            plt.register_cmap(cmap=custom_cmap)
+            try:
+                plt.cm.get_cmap("cmap_{0}_income".format(group_label))
+            except ValueError:
+                plt.register_cmap(cmap=custom_cmap)
+
             income_group_countries.plot(ax=plt.gca(), column=col, cmap=custom_cmap, vmin=cmin, vmax=cmax)
         # Remove black frame around plot
         for spine in plt.gca().spines.values():
@@ -152,7 +163,7 @@ class ExposurePlot(ExperiencedTPlot):
 
 
 
-class ContourPlot(ExperiencedTPlot):
+class ContourPlot(BasicPlot):
     def __init__(self, configurations, ac_data, name_tag, country=None):
         # Call parent class constructor
         super().__init__(configurations, ac_data, name_tag, country=country)
@@ -214,48 +225,29 @@ class ContourPlot(ExperiencedTPlot):
             y = self.ac_data[self.ac_data.index == income_group]['GDP']
             plt.scatter(x, y, label=income_group, c=self.configurations['income_groups_colors'][income_group], s=8, marker='o')
 
-    
-    def add_country_labels(self, countries, colors):
+    def add_labels(self, labels, colors):
         """
-        Label points with income group
+        Label points
         """ 
-        for txt in countries:
+        for txt in labels:
             color = colors[txt]
             label = txt
             fontsize=9
             id = self.ac_data.index
-            country_index = self.ac_data[id == txt].index
+            label_index = self.ac_data[id == txt].index
 
-            plt.annotate(label, (self.ac_data['CDD'][country_index]+50, self.ac_data['GDP'][country_index]*0.9),
+            plt.annotate(label, (self.ac_data['CDD'][label_index]+50, self.ac_data['GDP'][label_index]*0.9),
                          fontsize=fontsize, color=color)
 
 
-class GDPIncreaseMap(ExposurePlot):
+        
+class ScatterPlot(ExposurePlot):
     def __init__(self, configurations, ac_data, name_tag, scenario, country=None):
         super().__init__(configurations, ac_data, name_tag, scenario, country=country)
+
         # Format scenario name
         parts = self.scenario.split('_')
         self.formatted_scenario = parts[-1][:3].upper() + ' ' + parts[-1][3:4] + '.' + parts[-1][4:]
-    
-    def plot_growth_map(self):
-        """
-        Plot maps
-        """
-        if self.scenario == 'historical':
-            mean_gdp_growth = 'gdp_historical_growth'
-        else:
-            mean_gdp_growth = 'gdp_const_{0}'.format(self.scenario)
-        self.column_name = mean_gdp_growth
-        
-        self.ac_data_map_geo[mean_gdp_growth] = self.ac_data[mean_gdp_growth] * 100.
-
-        self.ac_data_map_geo.plot(column=mean_gdp_growth, cmap=self.configurations['plotting']['gdp_growth_cmap'],
-                                  vmin=self.configurations['plotting']['gdp_growth_min'], vmax=self.configurations['plotting']['gdp_growth_max'])
-
-        
-class GDPIncreaseScatter(GDPIncreaseMap):
-    def __init__(self, configurations, ac_data, name_tag, scenario, country=None):
-        super().__init__(configurations, ac_data, name_tag, scenario, country=country)
 
     def plot_scatter(self, data, groups):
         """
@@ -268,6 +260,7 @@ class GDPIncreaseScatter(GDPIncreaseMap):
             x = self.ac_data[self.ac_data['income_group'] == income_group][data[0]]
             y = self.ac_data[self.ac_data['income_group'] == income_group][data[1]]
             income_color = self.configurations['income_groups_colors'][income_group] 
+            income_color_map = "cmap_{0}_income".format(income_group)
 
             if 'gdp' in data[0]:
                 x = x * 100
@@ -278,8 +271,7 @@ class GDPIncreaseScatter(GDPIncreaseMap):
                 if 'diff' in data[1]:
                     axes_range_y = [min, self.configurations['plotting']['cdd_diff_max']]
                 axes_range = [min, self.configurations['plotting']['cdd_max']]
-                custom_cmap = LinearSegmentedColormap.from_list("custom_cmap", ["white", income_color])
-                sns.kdeplot(x=x, y=y, cmap=custom_cmap, fill=True, bw_adjust=1.2, alpha=0.75)
+                sns.kdeplot(x=x, y=y, cmap=income_color_map, fill=True, bw_adjust=1.2, alpha=0.75)
                 
             self.ax.scatter(x, y, label=income_group, s=42, marker='o',
                     c=income_color)

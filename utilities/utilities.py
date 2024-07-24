@@ -4,27 +4,10 @@ import logging
 import country_converter as coco
 from scipy.optimize import fsolve
 
-def saturation(cdd, c):
-    return (1. - np.exp(-c*cdd))
-
-def exp_avail(gdp, a, b):
-    return (1./(1. + np.exp(a)* np.exp(b*gdp)))
-
-def power_avail(gdp, beta, gamma):
-    return (gdp**beta / (gdp**beta + gamma**beta))
 
 def exposure_combined_exponential(xdata, alpha, beta, gamma):
     cdd, gdp = xdata
     return (np.exp(-alpha * ((cdd/1e3)**(beta*gdp/1e6) * (gdp/1e6)**gamma)))
-
-def exposure_function(xdata, avail_func, alpha, beta, gamma):
-    """
-    This function calculates the exposure of a country to outside temperature
-    """
-    cdd, gdp = xdata
-    avail = avail_func(gdp, beta, gamma)
-    sat = saturation(cdd, alpha)
-    return (1 - avail*sat) 
 
 
 def read_ac_data(infile, year=None, skip=0):
@@ -135,21 +118,22 @@ def fill_missing_country_gdp_data(start_year, data_frame, configs):
         add_value = -1
     for country_name in data_frame['ISO3']:
         data_year = start_year
+        full_name = coco.convert(names=country_name, to='name_short')
         if data_frame[data_frame['ISO3'] == country_name]['GDP'].isnull().values[0]:
-            logging.info("No data for {0} in {1}".format(country_name, start_year))
+            logging.info("No data for {0} in {1}".format(full_name, start_year))
             gdp_data_historical_country = None
             while gdp_data_historical_country == None:
                 data_year += add_value
                 # GDP data available from 1960 to 2022
                 if data_year > 2022 or data_year < 1960:
-                    logging.info("No data for {0} in any year".format(country_name))
+                    logging.info("No data for {0} in any year".format(full_name))
                     break
                 gdp_data_historical = read_gdp_data(configs['gdp_historical_file'])
                 gdp_data_historical = gdp_data_historical[gdp_data_historical['Year'] == data_year]
                 if not gdp_data_historical[gdp_data_historical['ISO3'] == country_name]['GDP'].isnull().values[0]:
                     gdp_data_historical_country = gdp_data_historical[gdp_data_historical['ISO3'] == country_name]['GDP'].values[0]
                     new_data_year = data_year
-                    logging.info("Found data for {0} in {1}".format(country_name, data_year))
+                    logging.info("Found data for {0} in {1}".format(full_name, data_year))
                 else:
                     new_data_year = start_year
             # Add GDP data to gdp_data
@@ -191,6 +175,24 @@ def read_projections(configurations, data_type, isin_df, year):
     output_df = output_df[output_df['ISO3'].isin(isin_df['ISO3'])]
 
     return output_df
+
+def read_income_classification(income_classification_file, year):
+    """
+    Read in income classification data
+    """
+    income_classification = pd.read_excel(income_classification_file, sheet_name='Country Analytical History', skiprows=5)
+
+    # Select the first column and the column with the year
+    ref_year_col = income_classification.columns[0]
+    income_classification = income_classification[[ref_year_col, year]]
+    # Drop rows with NaN values
+    income_classification = income_classification.dropna()
+    # Rename columns
+    income_classification = income_classification.rename(columns={'Unnamed: 0': 'ISO3', year: 'income_group'})
+    # Replace L with low, LM with lower middle, UM with upper middle, H with high
+    income_classification['income_group'] = income_classification['income_group'].replace({'L': 'low', 'LM': 'lower middle', 'UM': 'upper middle', 'H': 'high'})
+
+    return income_classification
 
 
 def calculate_average_gdp_growth(gdp_year_n, gdp_year_0, n_years):
@@ -240,11 +242,16 @@ def calculate_gdp_const(df, configurations, parameters, exp_cdd=None):
         gdp_const = gdp_from_cdd_exposure(exp_cdd, 
                     df['CDD_{0}_{1}'.format(scenario, configurations['analysis_years']['future_year'])], 
                     parameters)
-        # Replace inf with NaN
-        logging.info("Infinite GDP calculated for {0}, possibly 0 CDD".format(gdp_const[gdp_const == np.inf].index))
+        if np.any(gdp_const == np.inf):
+            # Replace inf with NaN
+            logging.info("Scenario: {0}, Label: {1}".format(scenario, label))
+            logging.info("Infinite GDP calculated for {0}, possibly 0 CDD".format(gdp_const[gdp_const == np.inf]))
         gdp_const[gdp_const == np.inf] = np.nan
         df['gdp_const_{0}{1}'.format(scenario, label)] = calculate_average_gdp_growth(gdp_const, df['GDP'], 
                 configurations['analysis_years']['future_year'] - df['Year_ref'])
+        # Print all NaN
+        if np.any(df['gdp_const_{0}{1}'.format(scenario, label)].isnull()):
+            logging.info("NaN GDP calculated for {0}".format(df[df['gdp_const_{0}{1}'.format(scenario, label)].isnull()]))
         # Set all negative values to NaN
         df.loc[df['gdp_const_{0}{1}'.format(scenario, label)] < 0, 'gdp_const_{0}{1}'.format(scenario, label)] = np.nan
     return df

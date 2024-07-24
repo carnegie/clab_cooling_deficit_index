@@ -1,5 +1,4 @@
-import country_converter as coco
-from utilities.plotting_classes import *
+from utilities.plotting_classes import ExposurePlot, ContourPlot, ScatterPlot
 
 def plot_variable_map(configurations, heat_exposure_df, plotting_variable):
     """
@@ -20,6 +19,7 @@ def plot_variable_map(configurations, heat_exposure_df, plotting_variable):
                                                     colorbar_max=configurations['plotting'][var_name+'_max'])
     map_plot.add_title(plotting_variable, fontsize=12)
     map_plot.save_figure()
+    map_plot.show_close_figure()
 
 def plot_income_groups(configurations, heat_exposure_df, col=None):
     """
@@ -35,32 +35,7 @@ def plot_income_groups(configurations, heat_exposure_df, col=None):
             map_plot_countries.add_colorbar(label=col, colormap="cmap_{0}_income".format(income_gr), colorbar_min=color_min, colorbar_max=color_max)
         map_plot_countries.remove_axes_ticks()
         map_plot_countries.save_figure()
-
-
-def plot_variable_histogram(configurations, heat_exposure_df, plotting_variable):
-    """
-    Plot histogram of the variable
-    """
-    histogram_plot = ExposurePlot(configurations, heat_exposure_df, '{0}_histogram'.format(plotting_variable))
-    x_max = (plotting_variable.lower() if len(plotting_variable.split('_')) == 1 else (plotting_variable.split('_')[0]+"_"+plotting_variable.split('_')[-1]).lower()) + '_max'
-    histogram_plot.plot_histogram(plotting_variable, configurations['plotting'][x_max])
-    histogram_plot.add_x_y_labels(configurations['plotting'][plotting_variable.split('_')[0].lower()+'_label'], 'Frequency')
-    histogram_plot.add_title(plotting_variable, fontsize=12)
-    histogram_plot.save_figure()
-    
-
-def plot_exposure_map(configurations, ac_data_historical, exposure_func, scenario):
-    """
-    Plot exposure map
-    """
-    exposure_map = ExposurePlot(configurations, ac_data_historical, 'exposure_map_{0}'.format(scenario), scenario, country=None)
-    exposure_map.create_exposure_map(exposure_func, scenario)
-    exposure_map.plot_exposure()
-    exposure_map.remove_axes_ticks()
-    exposure_map.add_colorbar(label=configurations['plotting']['exposure_times_cdd_label'], 
-                colormap='inferno_r', colorbar_max=configurations['plotting']['experiencedT_max'])
-    exposure_map.add_title(scenario, fontsize=12)
-    exposure_map.save_figure()
+        map_plot_countries.show_close_figure()
 
 def plot_exposure_contour(configurations, exposure_function, ac_data, x_y_ranges, country=None, name_tag='exposure_contour', multiply_cdd=True):
     """
@@ -75,38 +50,17 @@ def plot_exposure_contour(configurations, exposure_function, ac_data, x_y_ranges
     data_color = configurations['income_groups_colors']
     contour_plot.add_data()
     contour_plot.set_y_log()
-    contour_plot.add_country_labels(data_points, data_color)
+    contour_plot.add_labels(data_points, data_color)
     contour_plot.add_x_y_labels(configurations['plotting']['cdd_label'], configurations['plotting']['gdp_label'])
     contour_plot.save_figure()
-
-def plot_gdp_increase_map(configurations, gdp_cdd_data, future_scenario):
-    """
-    Plot annual average GDP growth for historical and constant experienced CDD
-    """
-    if not future_scenario == 'historical':
-        rcp_scenario = future_scenario.split('_')[1]
-        scenario_title = rcp_scenario + ' {0}-{1}'.format(configurations['analysis_years']['ref_year'], configurations['analysis_years']['future_year'])
-    else:
-        rcp_scenario = future_scenario
-        scenario_title = rcp_scenario + ' {0}-{1}'.format(configurations['analysis_years']['past_year'], configurations['analysis_years']['ref_year'])
-
-    gdp_increase_plot = GDPIncreaseMap(configurations, gdp_cdd_data, 'gdp_increase_map_{0}'.format(rcp_scenario), future_scenario)
-    gdp_increase_plot.create_data_map()
-    gdp_increase_plot.plot_growth_map()
-    gdp_increase_plot.grey_empty_countries(gdp_increase_plot.column_name)
-    gdp_increase_plot.remove_axes_ticks()
-    gdp_increase_plot.add_title(scenario_title, fontsize=12)
-    gdp_increase_plot.add_colorbar(label='Mean annual GDP growth (%)', colormap=configurations['plotting']['gdp_growth_cmap'],
-                                   colorbar_max=configurations['plotting']['gdp_growth_max'],
-                                   colorbar_min=configurations['plotting']['gdp_growth_min'])
-    gdp_increase_plot.save_figure()
+    contour_plot.show_close_figure()
 
 def plot_gdp_increase_scatter(configurations, gdp_cdd_data, future_scenario):
     """
     Plot difference in exposure times CDD as a function of GDP per capita
     """
     for income_group in configurations['income_groups_colors'].keys():
-        gdp_increase_scatter = GDPIncreaseScatter(configurations, gdp_cdd_data[gdp_cdd_data['income_group'] == income_group],
+        gdp_increase_scatter = ScatterPlot(configurations, gdp_cdd_data[gdp_cdd_data['income_group'] == income_group],
                             'gdp_increase_scatter_{0}_{1}'.format(future_scenario, income_group), future_scenario)
         gdp_increase_scatter.plot_scatter(['gdp_historical_growth', 'gdp_const_{0}'.format(future_scenario), 
                                     'gdp_const_{0}_custom_exp_cdd'.format(future_scenario)], [income_group])
@@ -115,6 +69,7 @@ def plot_gdp_increase_scatter(configurations, gdp_cdd_data, future_scenario):
                                     'gdp_const_{0}_custom_exp_cdd'.format(future_scenario)])
         gdp_increase_scatter.add_1_to_1_line(['gdp_historical_growth', 'gdp_const_{0}'.format(future_scenario)], min=-2., max=10.)
         gdp_increase_scatter.save_figure()
+        gdp_increase_scatter.show_close_figure()
 
 def plot_cdd_scatter(configurations, gdp_cdd_data, future_scenario):
     """
@@ -122,10 +77,11 @@ def plot_cdd_scatter(configurations, gdp_cdd_data, future_scenario):
     """
     gdp_cdd_data = gdp_cdd_data.dropna(subset=['CDD', 'CDD_{0}_2100_diff'.format(future_scenario), 'GDP'])
     for income_group in configurations['income_groups_colors'].keys():
-        gdp_increase_scatter = GDPIncreaseScatter(configurations, gdp_cdd_data[gdp_cdd_data['income_group'] == income_group], 
+        cdd_scatter = ScatterPlot(configurations, gdp_cdd_data[gdp_cdd_data['income_group'] == income_group], 
                                                   'cdd_scatter_{0}_{1}'.format(future_scenario, income_group), future_scenario)
-        gdp_increase_scatter.plot_scatter(['CDD', 'CDD_{0}_2100_diff'.format(future_scenario), None],
+        cdd_scatter.plot_scatter(['CDD', 'CDD_{0}_2100_diff'.format(future_scenario), None],
                             configurations['income_groups_colors'].keys())
-        gdp_increase_scatter.label_countries(configurations['label_countries'], ['CDD', 'CDD_{0}_2100_diff'.format(future_scenario)])
-        gdp_increase_scatter.add_x_y_labels('CDD in {0} (°C days)'.format(configurations['analysis_years']['ref_year']), 'CDD diff in 2100\nunder {0} (°C days)'.format(gdp_increase_scatter.formatted_scenario))
-        gdp_increase_scatter.save_figure()
+        cdd_scatter.label_countries(configurations['label_countries'], ['CDD', 'CDD_{0}_2100_diff'.format(future_scenario)])
+        cdd_scatter.add_x_y_labels('CDD in {0} (°C days)'.format(configurations['analysis_years']['ref_year']), 'CDD diff in 2100\nunder {0} (°C days)'.format(cdd_scatter.formatted_scenario))
+        cdd_scatter.save_figure()
+        cdd_scatter.show_close_figure()
