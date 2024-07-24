@@ -40,5 +40,10 @@ The underlying function describing air conditioning adoption depending on coolin
 
 Although it's not necessary to run this notebook before running the main script, the fit parameters used in the main script are obtained from it.
 
+## Data
+
+All data used in this study can be found in the ```data/``` directory. A summary table of all relevant data and calculated values can be found in [data/cooling_deficit_index_calculations.csv](https://github.com/carnegie/clab_cooling_deficit_index/blob/main/data/cooling_deficit_index_calculations.csv).
+The summarized data on air conditioning adoption can be found in [data/AC_adoption/summary_AC_adoption_data.csv](https://github.com/carnegie/clab_cooling_deficit_index/blob/main/data/AC_adoption/summary_AC_adoption_data.csv).
+
 ## License
 This project is licensed under the MIT License. See the [LICENSE](https://github.com/carnegie/clab_cooling_deficit_index/blob/main/LICENSE) file for details.
