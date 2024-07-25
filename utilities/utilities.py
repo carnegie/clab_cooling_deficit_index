@@ -23,7 +23,7 @@ def read_ac_data(infile, year=None, skip=0):
         ac_data = format_gdl_data(ac_data)
     # Rename country names to ISO3
     ac_data["ISO3"] = coco.convert(names=ac_data["Country"].tolist(), to='ISO3')
-    # Make sure all names are the same
+    # Make sure all names are the same, drop rows if no conversion found
     ac_data["Country"] = coco.convert(names=ac_data["ISO3"].tolist(), to='name_short')
     # AC Given in percent
     ac_data["AC"] /= 100.
@@ -238,6 +238,7 @@ def calculate_gdp_const(df, configurations, parameters, exp_cdd=None):
         label = ''
     else:
         label = '_custom_exp_cdd'
+    dfc = df.copy()
     for scenario in configurations['future_scenarios']:
         gdp_const = gdp_from_cdd_exposure(exp_cdd, 
                     df['CDD_{0}_{1}'.format(scenario, configurations['analysis_years']['future_year'])], 
@@ -247,11 +248,11 @@ def calculate_gdp_const(df, configurations, parameters, exp_cdd=None):
             logging.info("Scenario: {0}, Label: {1}".format(scenario, label))
             logging.info("Infinite GDP calculated for {0}, possibly 0 CDD".format(gdp_const[gdp_const == np.inf]))
         gdp_const[gdp_const == np.inf] = np.nan
-        df['gdp_const_{0}{1}'.format(scenario, label)] = calculate_average_gdp_growth(gdp_const, df['GDP'], 
-                configurations['analysis_years']['future_year'] - df['Year_ref'])
+        dfc.loc[:, 'gdp_const_{0}{1}'.format(scenario, label)] = calculate_average_gdp_growth(gdp_const, dfc['GDP'],
+                configurations['analysis_years']['future_year'] - dfc['Year_ref'])
         # Print all NaN
-        if np.any(df['gdp_const_{0}{1}'.format(scenario, label)].isnull()):
-            logging.info("NaN GDP calculated for {0}".format(df[df['gdp_const_{0}{1}'.format(scenario, label)].isnull()]))
+        if np.any(dfc['gdp_const_{0}{1}'.format(scenario, label)].isnull()):
+            logging.info("NaN GDP calculated for {0}".format(dfc[dfc['gdp_const_{0}{1}'.format(scenario, label)].isnull()]))
         # Set all negative values to NaN
-        df.loc[df['gdp_const_{0}{1}'.format(scenario, label)] < 0, 'gdp_const_{0}{1}'.format(scenario, label)] = np.nan
-    return df
+        dfc.loc[dfc['gdp_const_{0}{1}'.format(scenario, label)] < 0, 'gdp_const_{0}{1}'.format(scenario, label)] = np.nan
+    return dfc
