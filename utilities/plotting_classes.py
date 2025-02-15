@@ -61,9 +61,9 @@ class BasicPlot:
         """
         Save figure
         """
-        if not os.path.exists('Figures/paper'):
-            os.makedirs('Figures/paper')
-        plt.savefig('Figures/paper/{0}.pdf'.format(self.name_tag), dpi=500, bbox_inches='tight')
+        if not os.path.exists('figures/paper'):
+            os.makedirs('figures/paper')
+        plt.savefig('figures/paper/{0}.pdf'.format(self.name_tag), dpi=500, bbox_inches='tight')
 
     def show_close_figure(self):
         """
@@ -326,3 +326,29 @@ class ScatterPlot(ExposurePlot):
                     x = x * 100
                     y = y * 100
                 plt.annotate(txt, (x, y), fontsize=8, color='black', rotation=20)
+
+
+class SensitivityPlot(BasicPlot):
+    def __init__(self, configurations, ac_data, name_tag, country=None):
+        # Call parent class constructor
+        super().__init__(configurations, ac_data, name_tag, country=country)
+
+    def plot_sensitivity(self, data, income_group, column, color):
+        """
+        Plot sensitivity of exposure to GDP growth
+        """
+        # list all files in data with cooling_deficit_index_calculations
+        outdir = self.configurations['output_path'].split('/')[0]
+        sensitivity_paths = [f for f in os.listdir(outdir) if f.startswith('cooling_deficit_index_calculations_') and f.endswith('.csv')]
+        sensitivity_paths = ['cooling_deficit_index_calculations.csv'] + sensitivity_paths
+        line_styles = ['-', '--', '-.', ':']
+        for sens_path in sensitivity_paths:
+            sensitivity = sens_path.split('.')[0].replace('cooling_deficit_index_calculations_','')
+            sensitivity_df = pd.read_csv(os.path.join(outdir, sens_path))
+            sensitivity_df = sensitivity_df[sensitivity_df['income_group'] == income_group]
+            # Plot kernel density estimate of needed GDP growth to avoid increased exposure
+            sns.kdeplot(sensitivity_df[column]*100, color=color, bw_adjust=1.2, alpha=0.75, 
+                        linestyle=line_styles[sensitivity_paths.index(sens_path)], 
+                        label=sensitivity if not sensitivity=='cooling_deficit_index_calculations' else income_group+' base')
+        plt.legend()
+        

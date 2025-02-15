@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import logging
+import re
 import country_converter as coco
 from scipy.optimize import fsolve
 
@@ -10,7 +11,7 @@ def exposure_combined_exponential(xdata, alpha, beta, gamma):
     return (np.exp(-alpha * ((cdd/1e3)**(beta*gdp/1e6) * (gdp/1e6)**gamma)))
 
 
-def read_ac_data(infile, year=None, skip=0):
+def read_ac_data(infile, source, year=None, skip=0):
     """
     Read the air conditioning data from the given file
     """
@@ -29,6 +30,8 @@ def read_ac_data(infile, year=None, skip=0):
     ac_data["AC"] /= 100.
     # Keep 4 decimal points precision
     ac_data["AC"] = ac_data["AC"].round(4)
+    # Add a column for the data source
+    ac_data["Source"] = source
     return ac_data
 
 def format_oneyear_data(ac_data, year):
@@ -59,7 +62,10 @@ def add_gdp_cdd_data(ac_df, config):
     Add GDP and CDD data to the ac_df dataframe
     """
     # Read the cooling degree days data
-    cdd_data = read_cdd_data(config['cdd_historical_file'])
+    if config['sensitivity_analysis']['cdd_T21']['value']:
+        cdd_data = read_cdd_data(config['cdd_historical_file'].replace('18', '21'))
+    else:
+        cdd_data = read_cdd_data(config['cdd_historical_file'])
     # Read the GDP data
     gdp_data = read_gdp_data(config['gdp_historical_file'])
 
@@ -76,13 +82,14 @@ def read_cdd_data(cdd_data_path):
     # Drop unit column
     cdd_data = cdd_data.drop(columns=['Unit', 'Territory'])
     # Rename columns
-    cdd_data = cdd_data.rename(columns={'Country': 'ISO3', 'CDD18dailybypop': 'CDD', 'Date': 'Year'})
+    cdd_col = next((col for col in cdd_data.columns if re.match(r'CDD\d+dailybypop', col)), None)
+    cdd_data = cdd_data.rename(columns={'Country': 'ISO3', cdd_col: 'CDD', 'Date': 'Year'})
     # Round CDD to 5 decimal places
     cdd_data['CDD'] = cdd_data['CDD'].round(5)
 
     return cdd_data
 
-def read_gdp_data(gdp_data_path):
+def read_gdp_data(gdp_data_path, value_name='GDP per capita PPP'):
     """
     Read in GDP data from file
     """
@@ -90,13 +97,14 @@ def read_gdp_data(gdp_data_path):
     gdp_data = pd.read_csv(gdp_data_path, skiprows=4)
 
     # Drop columns
-    gdp_data = gdp_data.drop(columns=['Indicator Name', 'Indicator Code', "Country Name", 'Unnamed: 67'])
+    gdp_data = gdp_data.drop(columns=['Indicator Name', 'Indicator Code', 'Country Name'] + 
+                         [col for col in gdp_data.columns if "Unnamed" in col])
 
     # Convert data to long format
-    gdp_data = pd.melt(gdp_data, id_vars=["Country Code"], var_name='Year', value_name='GDP per capita PPP')
+    gdp_data = pd.melt(gdp_data, id_vars=["Country Code"], var_name='Year', value_name=value_name)
     
     # Rename Country Code to ISO3 and GDP per capita PPP to GDP
-    gdp_data = gdp_data.rename(columns={'Country Code': 'ISO3','GDP per capita PPP': 'GDP'})
+    gdp_data = gdp_data.rename(columns={'Country Code': 'ISO3', value_name: value_name.split(' ')[0]})
 
     # Convert year to integer
     gdp_data['Year'] = gdp_data['Year'].astype(int)

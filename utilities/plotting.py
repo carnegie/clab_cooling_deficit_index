@@ -1,4 +1,4 @@
-from utilities.plotting_classes import ExposurePlot, ContourPlot, ScatterPlot
+from utilities.plotting_classes import ExposurePlot, ContourPlot, ScatterPlot, SensitivityPlot
 
 def plot_variable_map(configurations, heat_exposure_df, plotting_variable):
     """
@@ -85,3 +85,17 @@ def plot_cdd_scatter(configurations, gdp_cdd_data, future_scenario):
         cdd_scatter.add_x_y_labels('CDD in {0} (°C days)'.format(configurations['analysis_years']['ref_year']), 'CDD diff in 2100\nunder {0} (°C days)'.format(cdd_scatter.formatted_scenario))
         cdd_scatter.save_figure()
         cdd_scatter.show_close_figure()
+
+def plot_sensitivity_analysis(configurations, heat_exposure_df, future_scenario):
+    """ 
+    Plot sensitivity analysis: 
+    Distribution of needed economic growth to avoid increased heat exposure varying uncertainties
+    """
+    for income_group in configurations['income_groups_colors'].keys():
+        sensitivity_plot = SensitivityPlot(configurations, heat_exposure_df, income_group+'_sensitivity_analysis')
+        sensitivity_plot.plot_sensitivity(heat_exposure_df[heat_exposure_df['income_group'] == income_group], 
+                                          income_group,
+                                        'gdp_const_{0}'.format(future_scenario), 
+                                        configurations['income_groups_colors'][income_group])
+        sensitivity_plot.add_x_y_labels('Mean annual GDP growth to avoid increased heat exposure (%)', 'Density')
+        sensitivity_plot.save_figure()

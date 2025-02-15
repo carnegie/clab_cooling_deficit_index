@@ -52,6 +52,20 @@ label_countries:
   - 'Democratic Republic of the Congo'
   - 'Sudan'
 
+# Senisitivity analysis
+# All sensitivities set to true will be used to calculate the cooling deficit index (on top of each other)
+sensitivity_analysis:
+  data_subset_2011:
+    label: "data_subset_2011"
+    value: false
+  pop_weighted:
+    label: "pop_weighted"
+    value: false
+  cdd_T21:
+    label: "cdd_T21"
+    value: false
+
+
 # Plotting settings
 plotting:
   # Ranges
