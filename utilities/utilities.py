@@ -4,6 +4,8 @@ import logging
 import re
 import country_converter as coco
 from scipy.optimize import fsolve
+from statsmodels.stats.weightstats import DescrStatsW
+import scipy.stats as stats
 
 
 def exposure_combined_exponential(xdata, alpha, beta, gamma):
@@ -264,3 +266,23 @@ def calculate_gdp_const(df, configurations, parameters, exp_cdd=None):
         # Set all negative values to NaN
         dfc.loc[dfc['gdp_const_{0}{1}'.format(scenario, label)] < 0, 'gdp_const_{0}{1}'.format(scenario, label)] = np.nan
     return dfc
+
+
+def weighted_pearsonr(x, y, weights):
+    """
+    Compute the population-weighted Pearson correlation coefficient and p-value.
+    """
+    # Compute weighted correlation coefficient
+    weighted_stats = DescrStatsW(np.vstack([x, y]).T, weights=weights, ddof=0)
+    corr = weighted_stats.corrcoef[0, 1]
+
+    # Compute effective sample size using Kish's approximation
+    n_effective = np.sum(weights) ** 2 / np.sum(weights ** 2)  
+
+    # Compute t-statistic for correlation
+    t_stat = corr * np.sqrt((n_effective - 2) / (1 - corr**2))
+
+    # Compute two-tailed p-value
+    p_value = 2 * stats.t.sf(abs(t_stat), df=n_effective - 2)
+
+    return corr, p_value
