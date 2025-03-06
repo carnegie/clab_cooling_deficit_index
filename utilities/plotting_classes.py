@@ -7,7 +7,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Normalize, LogNorm
-from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.colors import LinearSegmentedColormap, to_rgb
 
 
 class BasicPlot:
@@ -129,18 +129,26 @@ class ExposurePlot(BasicPlot):
         """
         Color countries that have data
         """
-        self.ac_data_map_geo.plot(ax=plt.gca(), edgecolor='grey', color='white')
         income_group_countries = self.ac_data_map_geo[self.ac_data_map_geo['income_group'] == group_label]
         if not col:
             income_group_countries.plot(ax=plt.gca(), color=color)
         else:
-            custom_cmap = LinearSegmentedColormap.from_list("cmap_{0}_income".format(group_label), ["white", color])
+            rgb = np.array(to_rgb(color))
+            light_rgb = rgb + 0.85 * (1 - rgb)
+            custom_cmap = LinearSegmentedColormap.from_list("cmap_{0}_income".format(group_label), [light_rgb, rgb])
             try:
                 plt.cm.get_cmap("cmap_{0}_income".format(group_label))
             except ValueError:
                 plt.register_cmap(cmap=custom_cmap)
 
             income_group_countries.plot(ax=plt.gca(), column=col, cmap=custom_cmap, vmin=cmin, vmax=cmax)
+
+        # Plot all other countries in white
+        other_countries = self.ac_data_map_geo[self.ac_data_map_geo['income_group'] != group_label]
+        other_countries.plot(ax=plt.gca(), color='white')
+
+        self.ac_data_map_geo.plot(ax=plt.gca(), edgecolor='grey', color='none')
+
         # Remove black frame around plot
         for spine in plt.gca().spines.values():
             spine.set_visible(False)
@@ -248,7 +256,7 @@ class ScatterPlot(ExposurePlot):
         parts = self.scenario.split('_')
         self.formatted_scenario = parts[-1][:3].upper() + ' ' + parts[-1][3:4] + '.' + parts[-1][4:]
 
-    def plot_scatter(self, data, groups):
+    def plot_scatter(self, data, groups, ratio_cdd=False):
         """
         Plot scatter plot, color coded by continent
         """
@@ -268,7 +276,11 @@ class ScatterPlot(ExposurePlot):
             else:
                 min = self.configurations['plotting']['cdd_min']
                 if 'diff' in data[1]:
-                    axes_range_y = [min, self.configurations['plotting']['cdd_diff_max']]
+                    if not ratio_cdd:
+                        axes_range_y = [min, self.configurations['plotting']['cdd_diff_max']]
+                    else:
+                        axes_range_y = [0, 6]
+                        y = y / x
                 axes_range = [min, self.configurations['plotting']['cdd_max']]
                 sns.kdeplot(x=x, y=y, cmap=income_color_map, fill=True, bw_adjust=1.2, alpha=0.75)
                 
@@ -287,7 +299,7 @@ class ScatterPlot(ExposurePlot):
                 y2 = self.ac_data[self.ac_data['income_group'] == income_group][data[2]].clip(lower=0)
                 if 'gdp' in data[2]:
                     y2 = y2 * 100
-                self.ax.scatter(x, y2, label=income_group, s=42, marker='o', linewidth=1.5,
+                self.ax.scatter(x, y2, label=income_group, s=42, marker='o', linewidth=0.5,
                         edgecolors=income_color, facecolors='none')
 
     
@@ -342,13 +354,51 @@ class SensitivityPlot(BasicPlot):
         sensitivity_paths = [f for f in os.listdir(outdir) if f.startswith('cooling_deficit_index_calculations_') and f.endswith('.csv')]
         sensitivity_paths = ['cooling_deficit_index_calculations.csv'] + sensitivity_paths
         line_styles = ['-', '--', '-.', ':']
+
+        # Plot vertical black line at historical median growth per income group
+        historical_med = self.ac_data[self.ac_data['income_group'] == income_group]['gdp_historical_growth'].median()*100
+
+        fig, ax = plt.subplots()
+
+        label_dict = {}
         for sens_path in sensitivity_paths:
-            sensitivity = sens_path.split('.')[0].replace('cooling_deficit_index_calculations_','')
+            sensitivity = sens_path.split('.')[0].replace('cooling_deficit_index_calculations_','')            
             sensitivity_df = pd.read_csv(os.path.join(outdir, sens_path))
             sensitivity_df = sensitivity_df[sensitivity_df['income_group'] == income_group]
+
+            linestyle = line_styles[sensitivity_paths.index(sens_path)]
+            if not sensitivity=='cooling_deficit_index_calculations':
+                label = sensitivity
+            else:
+                label = income_group + ' base'
             # Plot kernel density estimate of needed GDP growth to avoid increased exposure
-            sns.kdeplot(sensitivity_df[column]*100, color=color, bw_adjust=1.2, alpha=0.75, 
-                        linestyle=line_styles[sensitivity_paths.index(sens_path)], 
-                        label=sensitivity if not sensitivity=='cooling_deficit_index_calculations' else income_group+' base')
-        plt.legend()
+            kde = sns.kdeplot(sensitivity_df[column]*100, color=color, bw_adjust=1.2, alpha=0.75, 
+                    linestyle=linestyle, label=label)
+
+            # Extract KDE x and y values
+            x_kde = kde.get_lines()[-1].get_xdata()
+            y_kde = kde.get_lines()[-1].get_ydata()
+
+            # Ensure x_kde and y_kde are NumPy arrays for indexing
+            x_kde = np.array(x_kde)
+            y_kde = np.array(y_kde)
+
+            # Calculate area above the historical median
+            mask = x_kde >= historical_med
+            area = np.trapz(y_kde[mask], x_kde[mask]) / np.trapz(y_kde, x_kde) * 100
+
+            # Add percentage to label of line
+            new_label = f"{label}\n({area:.1f}% above historical)"
+            label_dict[label] = new_label
+            
+            # Axes ranges
+            ax.set_xlim(-2, 10)
+            ax.set_ylim(0, 1.25)
         
+        handles, labels = ax.get_legend_handles_labels()
+        new_labels = [label_dict[label] for label in labels]
+        
+        # Add vertical line at historical median growth
+        plt.axvline(x=historical_med, color='black', linestyle='--', label='Historical median')
+
+        ax.legend(handles, new_labels, loc='best')

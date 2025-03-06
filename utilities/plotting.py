@@ -71,7 +71,7 @@ def plot_gdp_increase_scatter(configurations, gdp_cdd_data, future_scenario):
         gdp_increase_scatter.save_figure()
         gdp_increase_scatter.show_close_figure()
 
-def plot_cdd_scatter(configurations, gdp_cdd_data, future_scenario):
+def plot_cdd_scatter(configurations, gdp_cdd_data, future_scenario, ratio_cdd=False):
     """
     Plot difference in exposure times CDD as a function of GDP per capita
     """
@@ -80,9 +80,9 @@ def plot_cdd_scatter(configurations, gdp_cdd_data, future_scenario):
         cdd_scatter = ScatterPlot(configurations, gdp_cdd_data[gdp_cdd_data['income_group'] == income_group], 
                                                   'cdd_scatter_{0}_{1}'.format(future_scenario, income_group.replace(" ","_")), future_scenario)
         cdd_scatter.plot_scatter(['CDD', 'CDD_{0}_2100_diff'.format(future_scenario), None],
-                            configurations['income_groups_colors'].keys())
+                            configurations['income_groups_colors'].keys(), ratio_cdd=ratio_cdd)
         cdd_scatter.label_countries(configurations['label_countries'], ['CDD', 'CDD_{0}_2100_diff'.format(future_scenario)])
-        cdd_scatter.add_x_y_labels('CDD in {0} (°C days)'.format(configurations['analysis_years']['ref_year']), 'CDD diff in 2100\nunder {0} (°C days)'.format(cdd_scatter.formatted_scenario))
+        cdd_scatter.add_x_y_labels('CDD in {0} (°C days)'.format(configurations['analysis_years']['ref_year']), 'CDD ratio increase in 2100\nunder {0} (°C days)'.format(cdd_scatter.formatted_scenario))
         cdd_scatter.save_figure()
         cdd_scatter.show_close_figure()
 
