@@ -32,7 +32,7 @@ def plot_income_groups(configurations, heat_exposure_df, col=None):
         color_max = 5
         map_plot_countries.color_countries(configurations['income_groups_colors'][income_gr], income_gr, col, cmin=color_min, cmax=color_max)
         if col:
-            map_plot_countries.add_colorbar(label=col, colormap="cmap_{0}_income".format(income_gr), colorbar_min=color_min, colorbar_max=color_max)
+            map_plot_countries.add_colorbar(label=col, colormap="cmap_{0}_income_fine".format(income_gr), colorbar_min=color_min, colorbar_max=color_max)
         map_plot_countries.remove_axes_ticks()
         map_plot_countries.save_figure()
         map_plot_countries.show_close_figure()

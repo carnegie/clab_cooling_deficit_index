@@ -134,14 +134,29 @@ class ExposurePlot(BasicPlot):
             income_group_countries.plot(ax=plt.gca(), color=color)
         else:
             rgb = np.array(to_rgb(color))
+
             light_rgb = rgb + 0.85 * (1 - rgb)
             custom_cmap = LinearSegmentedColormap.from_list("cmap_{0}_income".format(group_label), [light_rgb, rgb])
+
+            lighter_rgb = rgb + 0.9 * (1 - rgb)       # lighter
+            dark_rgb  = rgb * 0.25                   # darker
+
+            custom_cmap_fine = LinearSegmentedColormap.from_list(
+                f"cmap_{group_label}_income_fine", 
+                [lighter_rgb, rgb, dark_rgb]
+            )
+
             try:
+                # Try to retrieve simple and extended colormap for later
                 plt.cm.get_cmap("cmap_{0}_income".format(group_label))
             except ValueError:
                 plt.register_cmap(cmap=custom_cmap)
+            try:
+                plt.cm.get_cmap("cmap_{0}_income_fine".format(group_label))
+            except ValueError:
+                plt.register_cmap(cmap=custom_cmap_fine)
 
-            income_group_countries.plot(ax=plt.gca(), column=col, cmap=custom_cmap, vmin=cmin, vmax=cmax)
+            income_group_countries.plot(ax=plt.gca(), column=col, cmap=custom_cmap_fine, vmin=cmin, vmax=cmax)
 
         # Plot all other countries in white
         other_countries = self.ac_data_map_geo[self.ac_data_map_geo['income_group'] != group_label]
